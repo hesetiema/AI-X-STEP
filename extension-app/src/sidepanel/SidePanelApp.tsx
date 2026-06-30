@@ -6,7 +6,6 @@ import { panelStyles, COLORS, SPACING } from './styles';
 import PagePerfIndicator from './components/PagePerfIndicator';
 import RecordControls from './components/RecordControls';
 import DeepDiagnosisToggle from './components/DeepDiagnosisToggle';
-import ResultCard from './components/ResultCard';
 import SessionTimeline from './components/SessionTimeline';
 import UserHintForm from './components/UserHintForm';
 import { useSidePanelStore } from './store';
@@ -105,20 +104,31 @@ const SidePanelApp: React.FC = () => {
           <PagePerfIndicator />
         ) : (
           <>
-            {/* 录制控制按钮 */}
-            <RecordControls />
+            {/* 空闲态：开始按钮 + 深度诊断 */}
+            {status === 'idle' && (
+              <>
+                <RecordControls />
+                <DeepDiagnosisToggle />
+              </>
+            )}
 
-            {/* 深度诊断开关 */}
-            <DeepDiagnosisToggle />
+            {/* 录制中：停止按钮 + 深度诊断 */}
+            {status === 'recording' && (
+              <>
+                <RecordControls />
+                <DeepDiagnosisToggle />
+                <SessionTimeline />
+              </>
+            )}
 
-            {/* 提交结果 */}
-            <ResultCard />
-
-            {/* 事件时间线 */}
-            <SessionTimeline />
-
-            {/* 用户备注（提交前补充） */}
-            <UserHintForm />
+            {/* 停止后：操作内容 + 提交 */}
+            {(status === 'stopped' || status === 'uploading' || status === 'uploaded' || status === 'failed') && (
+              <>
+                <SessionTimeline />
+                <UserHintForm />
+                <RecordControls />
+              </>
+            )}
           </>
         )}
       </div>
