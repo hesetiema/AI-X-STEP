@@ -41,13 +41,19 @@ class SessionManager {
   }
 
   async stopRecording(tabId: number): Promise<SessionStats | null> {
-    const response = await this.sendMessageToTab<FetchSessionResponse>(tabId, {
-      type: 'STOP_RECORDING',
-      tabId,
-    });
-    const stats = response?.stats ?? null;
-    tabRegistry.update(tabId, { status: 'stopped', stats: stats ?? undefined });
-    return stats;
+    try {
+      const response = await this.sendMessageToTab<FetchSessionResponse>(tabId, {
+        type: 'STOP_RECORDING',
+        tabId,
+      });
+      const stats = response?.stats ?? null;
+      tabRegistry.update(tabId, { status: 'stopped', stats: stats ?? undefined });
+      return stats;
+    } catch {
+      // content script 可能已卸载（tab 关闭），静默处理
+      tabRegistry.setStatus(tabId, 'stopped');
+      return null;
+    }
   }
 
   async getStats(tabId: number): Promise<SessionStats | null> {

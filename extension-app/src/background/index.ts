@@ -4,6 +4,9 @@
 import { sessionManager } from './session-manager';
 import { tabRegistry } from './tab-registry';
 import type { RuntimeMessage, UploadResult } from '@/shared/types';
+import { deepDiagnosis } from './cdp-stack-capturer';
+import { loadSession, clearSession } from '@/shared/storage/session-store';
+import { createDiagnosis } from '@/shared/api';
 
 // 处理来自 popup / sidepanel / content script 的消息
 chrome.runtime.onMessage.addListener(
@@ -44,9 +47,24 @@ async function handleMessage(message: RuntimeMessage, sender: chrome.runtime.Mes
     }
     case 'GET_SESSION_STATUS': {
       const tabId = await resolveActiveTabId(message.tabId);
-      const stats = await sessionManager.getStats(tabId);
+      let stats = await sessionManager.getStats(tabId).catch(() => null);
       if (stats) tabRegistry.setStats(tabId, stats);
-      return { ok: true, meta: tabRegistry.get(tabId) };
+
+      // SW 重启后 tabRegistry 为空，兜底从 chrome.storage.session 恢复
+      const meta = tabRegistry.get(tabId);
+      if (meta && meta.status === 'idle') {
+        const persisted = await loadSession(tabId).catch(() => null);
+        if (persisted) {
+          tabRegistry.upsert(tabId, {
+            status: persisted.status,
+            startedAt: persisted.startedAt ? new Date(persisted.startedAt).getTime() : undefined,
+            stats: persisted.stats,
+          });
+          return { ok: true, meta: tabRegistry.get(tabId) };
+        }
+      }
+
+      return { ok: true, meta };
     }
     case 'GET_SESSION_STATS': {
       const tabId = await resolveActiveTabId(message.tabId);
@@ -86,6 +104,99 @@ async function handleMessage(message: RuntimeMessage, sender: chrome.runtime.Mes
         return { ok: false, error: errMsg };
       }
     }
+    case 'SET_USER_HINT': {
+      const tabId = await resolveActiveTabId(message.tabId);
+      await chrome.tabs.sendMessage(tabId, { type: 'SET_USER_HINT', userHint: message.userHint });
+      return { ok: true };
+    }
+    case 'ENABLE_DEEP_DIAGNOSIS': {
+      const tabId = await resolveActiveTabId(message.tabId);
+      await deepDiagnosis.attach(tabId);
+      // 通知 content script 开启 DOM observer 的深度诊断模式
+      try {
+        await chrome.tabs.sendMessage(tabId, { type: 'ENABLE_DEEP_DIAGNOSIS' });
+      } catch {
+        // content script 可能未就绪，忽略
+      }
+      console.log('[TraceLens] deep diagnosis enabled for tab', tabId);
+      return { ok: true };
+    }
+    case 'DISABLE_DEEP_DIAGNOSIS': {
+      const tabId = await resolveActiveTabId(message.tabId);
+      await deepDiagnosis.detach(tabId);
+      try {
+        await chrome.tabs.sendMessage(tabId, { type: 'DISABLE_DEEP_DIAGNOSIS' });
+      } catch {
+        // ignore
+      }
+      console.log('[TraceLens] deep diagnosis disabled for tab', tabId);
+      return { ok: true };
+    }
+    case 'CAPTURE_CLICK_RUNTIME': {
+      const tabId = await resolveActiveTabId();
+      const capture = await deepDiagnosis.consumeCapture(tabId);
+      return {
+        ok: true,
+        frames: capture?.frames ?? [],
+        scopeVariables: capture?.scopeVariables ?? [],
+      };
+    }
+    case 'PERF_UPDATE': {
+      const tabId = await resolveActiveTabId(message.tabId);
+      // 转发性能摘要到 side panel
+      chrome.runtime
+        .sendMessage({ type: 'PERF_UPDATE', tabId, perf: message.perf })
+        .catch(() => {});
+      return { ok: true };
+    }
+    case 'DIAGNOSE_PAGE_LOAD': {
+      const tabId = await resolveActiveTabId(message.tabId);
+      // 请求 content script 提供 autoObserve 缓冲区中的 performance + network 事件
+      try {
+        const response = await chrome.tabs.sendMessage(tabId, {
+          type: 'FETCH_AUTO_OBSERVE',
+        });
+        if (response && response.ok && response.events) {
+          const events = response.events as Array<Record<string, unknown>>;
+          const title = (await chrome.tabs.get(tabId)).title ?? 'Unknown';
+          const url = (await chrome.tabs.get(tabId)).url ?? '';
+
+          const dto = {
+            appId: 'diagnosis-extension',
+            pageUrl: url,
+            title,
+            evidence: events.map((e) => ({
+              id: e.eventId ?? crypto.randomUUID(),
+              type: e.kind === 'performance'
+                ? 'performance_event'
+                : e.kind === 'network'
+                ? 'network_event'
+                : 'ui_event',
+              label:
+                e.kind === 'performance'
+                  ? `performance:${(e as Record<string,unknown>).perfType ?? 'first_screen_complete'}`
+                  : e.kind === 'network'
+                  ? `${(e as Record<string,unknown>).method ?? 'GET'} ${(e as Record<string,unknown>).url ?? ''}`
+                  : `${e.kind ?? 'unknown'}`,
+              value: e as Record<string, unknown>,
+              source: 'auto-observe',
+              timestamp: new Date().toISOString(),
+            })),
+          };
+          const task = await createDiagnosis(dto as unknown as import('@/shared/types').CreateDiagnosisDto);
+
+          // 打开工作台查看结果
+          await chrome.tabs.create({
+            url: chrome.runtime.getURL('src/workbench/index.html') + `?taskId=${task.taskId}`,
+          });
+
+          return { ok: true, taskId: task.taskId };
+        }
+        return { ok: false, error: 'no auto-observe events' };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
     default:
       return { ok: false, error: 'unknown message type' };
   }
@@ -108,6 +219,30 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 console.log('[TraceLens] background service worker started');
+
+// ---- Tab 生命周期监听 ----
+
+// 用户切换 tab → 通知 side panel 重置到新 tab 的状态。
+// 仅处理普通浏览器窗口中的 tab 切换，跳过 popup/popup 窗口（如工作台）。
+// chrome.windows.get 是异步的，确认窗口类型后再决定是否发消息。
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  chrome.windows.get(activeInfo.windowId, (win) => {
+    if (chrome.runtime.lastError || !win) return;
+    if (win.type !== 'normal') return;
+    chrome.runtime
+      .sendMessage({ type: 'TAB_SWITCHED', tabId: activeInfo.tabId })
+      .catch(() => {});
+  });
+});
+
+// 用户关闭 tab → 停止录制 + 清理 registry + 清理 storage + 清理 CDP
+chrome.tabs.onRemoved.addListener((tabId) => {
+  sessionManager.stopRecording(tabId).catch(() => {});
+  tabRegistry.remove(tabId);
+  clearSession(tabId).catch(() => {});
+  deepDiagnosis.detach(tabId).catch(() => {});
+  console.log('[TraceLens] tab closed, cleaned up:', tabId);
+});
 
 // chrome.storage.session 默认仅扩展上下文（background/popup/sidepanel）可访问，
 // content script 读不到。开启 TRUSTED_AND_UNTRUSTED_CONTEXTS 让 content script

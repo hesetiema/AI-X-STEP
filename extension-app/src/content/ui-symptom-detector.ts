@@ -56,6 +56,13 @@ export class UiSymptomDetector {
   }
 
   private startMutationObserver(): void {
+    if (!document.body) {
+      // Content script 在 document_start 注入时，body 可能尚未就绪。
+      // 等待 DOMContentLoaded 后再尝试。
+      document.addEventListener('DOMContentLoaded', () => this.startMutationObserver(), { once: true });
+      return;
+    }
+
     this.observer = new MutationObserver((mutations) => {
       if (!this.recorder.isActive) return;
       for (const mutation of mutations) {

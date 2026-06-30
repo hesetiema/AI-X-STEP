@@ -48,14 +48,15 @@ export class RankingService {
 
 function layerPriority(layer: string): number {
   const priorities: Record<string, number> = {
-    user_action: 1,
-    ui_state: 2,
-    frontend_app: 3,
-    bff: 4,
-    api: 5,
-    domain: 6,
-    db: 7,
-    external: 8,
+    page_load: 1,
+    user_action: 2,
+    ui_state: 3,
+    frontend_app: 4,
+    bff: 5,
+    api: 6,
+    domain: 7,
+    db: 8,
+    external: 9,
   };
   return priorities[layer] ?? 0;
 }

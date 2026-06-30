@@ -32,7 +32,7 @@ function storageKey(tabId: number): string {
 }
 
 function emptyStats(): SessionStats {
-  return { total: 0, interaction: 0, network: 0, error: 0, bridge: 0 };
+  return { total: 0, interaction: 0, network: 0, error: 0, bridge: 0, performance: 0 };
 }
 
 export async function loadSession(tabId: number): Promise<PersistedSession | null> {
@@ -117,6 +117,26 @@ export function updateUserHint(tabId: number, hint: UserHint): Promise<void> {
     const session = await loadSession(tabId);
     if (!session) return;
     await saveSession(tabId, { ...session, userHint: hint });
+  });
+}
+
+/**
+ * 按 eventId 补充已持久化事件的字段（如 stackTrace / scopeVariables）。
+ * CDP 捕获数据异步到达后，合并到 storage 镜像中的原始点击事件。
+ */
+export function supplementEvent(
+  tabId: number,
+  eventId: string,
+  data: Partial<ProbeEvent>,
+): Promise<void> {
+  return serializeWrite(tabId, async () => {
+    const session = await loadSession(tabId);
+    if (!session) return;
+    const event = session.events.find((e) => e.eventId === eventId);
+    if (event) {
+      Object.assign(event, data);
+      await saveSession(tabId, { ...session, events: session.events });
+    }
   });
 }
 

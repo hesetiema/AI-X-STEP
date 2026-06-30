@@ -9,6 +9,8 @@ import { RankingService } from '../domain/ranking.service';
 import { DiagnosisConclusionService } from '../domain/diagnosis-conclusion.service';
 import { DominoChainBuilder } from '../builders/domino-chain.builder';
 import { ExplanationBuilder } from '../builders/explanation.builder';
+import { LlmDiagnosisService } from './llm-diagnosis.service';
+import { BusinessSemanticAnalyzer, BusinessContext } from './business-semantic-analyzer.service';
 
 @Injectable()
 export class DiagnosisCommandService {
@@ -19,6 +21,8 @@ export class DiagnosisCommandService {
     private readonly conclusionService: DiagnosisConclusionService,
     private readonly dominoChainBuilder: DominoChainBuilder,
     private readonly explanationBuilder: ExplanationBuilder,
+    private readonly llmDiagnosis: LlmDiagnosisService,
+    private readonly businessSemantic: BusinessSemanticAnalyzer,
     @Inject('DiagnosisRepository') private readonly repository: DiagnosisRepository,
   ) {}
 
@@ -69,7 +73,9 @@ export class DiagnosisCommandService {
       const dominoChain = this.dominoChainBuilder.build(rankedFindings, context);
       task.dominoChain = dominoChain;
 
-      const explanation = this.explanationBuilder.build(conclusion, rankedFindings, dominoChain);
+      const businessContext = this.businessSemantic.preprocess(context);
+      const llmResult = await this.llmDiagnosis.analyze({ context, rankedFindings, conclusion, dominoChain, businessContext });
+      const explanation = this.explanationBuilder.build(conclusion, rankedFindings, dominoChain, llmResult);
       task.explanation = explanation;
 
       task.status = DiagnosisTaskStage.COMPLETED;

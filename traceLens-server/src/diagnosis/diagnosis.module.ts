@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { DiagnosisController } from './diagnosis.controller';
 import { DiagnosisService } from './services/diagnosis.service';
 import { DiagnosisCommandService } from './services/diagnosis-command.service';
@@ -10,9 +11,13 @@ import { RuleEngineService } from './domain/rule-engine.service';
 import { RankingService } from './domain/ranking.service';
 import { DiagnosisConclusionService } from './domain/diagnosis-conclusion.service';
 import { DiagnosisRuleRegistry } from './domain/diagnosis-rule.registry';
-import { InMemoryDiagnosisRepository } from './repositories/in-memory-diagnosis.repository';
+import { DiagnosisTaskEntity } from './entities/diagnosis-task.entity';
+import { MysqlDiagnosisRepository } from './repositories/mysql-diagnosis.repository';
+import { LlmDiagnosisService } from './services/llm-diagnosis.service';
+import { BusinessSemanticAnalyzer } from './services/business-semantic-analyzer.service';
 
 @Module({
+  imports: [TypeOrmModule.forFeature([DiagnosisTaskEntity])],
   controllers: [DiagnosisController],
   providers: [
     DiagnosisService,
@@ -21,11 +26,13 @@ import { InMemoryDiagnosisRepository } from './repositories/in-memory-diagnosis.
     ContextBuilderService,
     DominoChainBuilder,
     ExplanationBuilder,
+    LlmDiagnosisService,
+    BusinessSemanticAnalyzer,
     RuleEngineService,
     RankingService,
     DiagnosisConclusionService,
     DiagnosisRuleRegistry,
-    { provide: 'DiagnosisRepository', useClass: InMemoryDiagnosisRepository },
+    { provide: 'DiagnosisRepository', useClass: MysqlDiagnosisRepository },
   ],
   exports: [DiagnosisService],
 })

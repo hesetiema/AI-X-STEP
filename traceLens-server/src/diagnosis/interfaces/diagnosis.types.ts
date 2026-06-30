@@ -93,13 +93,27 @@ export interface DominoNode {
   children: string[];
 }
 
-export type DominoNodeType = 'user_action' | 'ui_state' | 'frontend_app' | 'bff' | 'api' | 'domain' | 'db' | 'external';
+export type DominoNodeType = 'page_load' | 'user_action' | 'ui_state' | 'frontend_app' | 'bff' | 'api' | 'domain' | 'db' | 'external';
 
 export interface DiagnosisExplanation {
   summaryText: string;
   evidenceNarrative: string[];
   operatorAdvice: string[];
   symptomNotes: string[];
+  llmNarrative?: string;
+  brokenStage?: DominoNodeType;
+  hypotheses?: string[];
+  llmConfidence?: number;
+  llmModel?: string;
+}
+
+export interface LlmDiagnosisResult {
+  narrative: string;
+  brokenStage: DominoNodeType;
+  hypotheses: string[];
+  confidence: number;
+  advice: string[];
+  model: string;
 }
 
 export interface CreateDiagnosisRequest {
@@ -141,4 +155,5 @@ export enum EvidenceType {
   LOG = 'log',
   TRACE_SPAN = 'trace_span',
   METRIC = 'metric',
+  PERFORMANCE = 'performance_event',
 }

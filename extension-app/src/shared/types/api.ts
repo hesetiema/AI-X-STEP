@@ -29,6 +29,7 @@ export interface DominoNode {
   id: string;
   label: string;
   type:
+    | 'page_load'
     | 'user_action'
     | 'ui_state'
     | 'frontend_app'
@@ -47,6 +48,11 @@ export interface DiagnosisExplanation {
   evidenceNarrative: string[];
   operatorAdvice: string[];
   symptomNotes: string[];
+  llmNarrative?: string;
+  brokenStage?: DominoNode['type'];
+  hypotheses?: string[];
+  llmConfidence?: number;
+  llmModel?: string;
 }
 
 export interface DiagnosisConclusion {

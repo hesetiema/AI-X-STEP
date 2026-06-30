@@ -1,13 +1,16 @@
 // probe-event.ts
 // 统一事件模型 —— 插件观测事件与页面桥接事件的公共基类
 
+import type { DomContext } from './dom-context';
+
 export type ProbeEvent =
   | UiEvent
   | UiStateEvent
   | NetworkEvent
   | ErrorEvent
   | BridgeEvent
-  | ObservationEvent;
+  | ObservationEvent
+  | PerformanceEvent;
 
 export interface BaseProbeEvent {
   eventId: string;
@@ -23,6 +26,22 @@ export interface UiEvent extends BaseProbeEvent {
   domPath?: string;
   textSummary?: string;
   route?: string;
+  domContext?: DomContext;
+  stackTrace?: StackFrame[];
+  scopeVariables?: ScopeVariable[];
+}
+
+export interface StackFrame {
+  functionName: string;
+  url: string;
+  lineNumber: number;
+  columnNumber: number;
+}
+
+export interface ScopeVariable {
+  name: string;
+  type: string;
+  valueSummary: string;
 }
 
 export interface UiStateEvent extends BaseProbeEvent {
@@ -88,4 +107,33 @@ export interface ObservationEvent extends BaseProbeEvent {
     | 'ui_response_mismatch';
   module?: string;
   detail?: Record<string, unknown>;
+}
+
+export interface PerformanceEvent extends BaseProbeEvent {
+  kind: 'performance';
+  perfType: 'first_screen_complete';
+  pageUrl: string;
+  timing: {
+    fcp?: number;
+    lcp?: number;
+    ttfb?: number;
+    cls?: number;
+    domContentLoaded?: number;
+    loadComplete?: number;
+    firstScreenReadyMs?: number;
+    lastApiEndMs?: number;
+    observations?: string[];
+  };
+  firstScreenApis?: FirstScreenApiSummary[];
+  navigationalType?: 'navigate' | 'reload' | 'back_forward' | 'prerender';
+}
+
+export interface FirstScreenApiSummary {
+  url: string;
+  method: string;
+  status?: number;
+  startedAt: number;
+  durationMs: number;
+  phaseDerived: 'success' | 'error' | 'timeout' | 'slow' | 'normal';
+  isBlocking?: boolean;
 }

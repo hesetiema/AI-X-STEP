@@ -1,13 +1,21 @@
 // shared/constants/config.ts
 
-export const BACKEND_ENDPOINT = 'http://localhost:4220/api/v1/diagnosis';
-export const BACKEND_BASE = 'http://localhost:4220';
+export const BACKEND_ENDPOINT = 'http://localhost:8080/api/v1/diagnosis';
+export const BACKEND_BASE = 'http://localhost:8080';
 
 export const RECORDER_CONFIG = {
   MAX_EVENTS: 500,
   MAX_TEXT_LENGTH: 100,
   MAX_ERROR_STACK_LENGTH: 500,
   LONG_LOADING_THRESHOLD_MS: 5000,
+  FIRST_SCREEN_API_TIMEOUT_MS: 10000,
+  SLOW_LCP_THRESHOLD_MS: 2500,
+  SLOW_FCP_THRESHOLD_MS: 1800,
+  SLOW_TTFB_THRESHOLD_MS: 800,
+  HIGH_CLS_THRESHOLD: 0.1,
+  LONG_API_DURATION_MS: 500,
+  FIRST_SCREEN_STABLE_GAP_MS: 200,
+  MAX_FIRST_SCREEN_APIS: 30,
 } as const;
 
 // 便捷单值导出

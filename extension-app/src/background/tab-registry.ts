@@ -51,6 +51,15 @@ class TabRegistry {
     this.map.delete(tabId);
   }
 
+  remove(tabId: number): void {
+    this.map.delete(tabId);
+  }
+
+  upsert(tabId: number, partial: Partial<TabSessionMeta>): void {
+    const existing = this.ensure(tabId);
+    Object.assign(existing, partial);
+  }
+
   on(listener: (meta: TabSessionMeta) => void): () => void {
     this.listeners.push(listener);
     return () => {

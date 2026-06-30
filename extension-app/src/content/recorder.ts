@@ -6,6 +6,8 @@ import type {
   ProbeEvent,
   SessionStatus,
   PageContext,
+  StackFrame,
+  ScopeVariable,
 } from '@/shared/types';
 import { generateSessionId, generateEventId } from '@/shared/utils';
 import {
@@ -16,6 +18,7 @@ import {
   appendEvent as persistAppendEvent,
   updateStats as persistUpdateStats,
   updateUserHint as persistUpdateUserHint,
+  supplementEvent as persistSupplementEvent,
   emptyStats,
   type PersistedSession,
 } from '@/shared/storage/session-store';
@@ -37,8 +40,10 @@ export interface RecorderOptions {
 export class Recorder {
   private session: DiagnosisSession | null = null;
   private buffer = new EventBuffer();
+  private autoObserveBuffer = new EventBuffer();
   private listeners: Array<(status: SessionStatus, stats: unknown) => void> = [];
   private lastTabId: number | null = null; // 最近会话的 tabId，供 reset 清理 storage
+  private autoTabId: number | null = null; // 自动观察用的 tabId
 
   get status(): SessionStatus {
     return this.session?.status ?? 'idle';
@@ -78,14 +83,21 @@ export class Recorder {
       stats: emptyStats(),
     };
     void initSession(opts.tabId, persisted);
+    // 将自动观察 buffer 中的事件 flush 到主 buffer（使手动录制会话包含首屏性能数据）
+    for (const e of this.autoObserveBuffer.snapshot()) {
+      this.buffer.append(e);
+    }
+    this.autoObserveBuffer.clear();
+
     this.emitChange();
   }
 
-  append(partial: BaseProbeEventPartial): void {
-    if (!this.isActive || !this.session) return;
+  append(partial: BaseProbeEventPartial): string | null {
+    if (!this.isActive || !this.session) return null;
+    const eventId = generateEventId();
     const event: ProbeEvent = {
       ...partial,
-      eventId: generateEventId(),
+      eventId,
       occurredAt: Date.now(),
       tabId: this.session.tabId,
     } as ProbeEvent;
@@ -95,6 +107,47 @@ export class Recorder {
     void persistAppendEvent(tabId, event);
     void persistUpdateStats(tabId, this.buffer.getStats());
     this.emitChange();
+    return eventId;
+  }
+
+  /**
+   * 自动观察写入 —— 始终收集，不依赖 manual recording 状态。
+   * PerformanceObserver 等自动观察者通过此方法写入事件。
+   */
+  appendAutoObserve(partial: BaseProbeEventPartial): string | null {
+    const eventId = generateEventId();
+    const tabId = this.lastTabId ?? this.autoTabId ?? 0;
+    const event: ProbeEvent = {
+      ...partial,
+      eventId,
+      occurredAt: Date.now(),
+      tabId,
+    } as ProbeEvent;
+    this.autoObserveBuffer.append(event);
+    return eventId;
+  }
+
+  /** 获取自动观察缓冲区快照，供按需诊断使用 */
+  getAutoObserveSnapshot(): ProbeEvent[] {
+    return this.autoObserveBuffer.snapshot();
+  }
+
+  setAutoTabId(tabId: number): void {
+    this.autoTabId = tabId;
+  }
+
+  /**
+   * 按 eventId 补充事件字段（如 stackTrace / scopeVariables）。
+   * CDP 捕获数据异步到达后调用，合并到原始点击事件。
+   */
+  supplementEvent(
+    eventId: string,
+    data: { stackTrace?: StackFrame[]; scopeVariables?: ScopeVariable[] },
+  ): void {
+    if (!this.session) return;
+    this.buffer.supplement(eventId, data as Partial<ProbeEvent>);
+    const tabId = this.session.tabId;
+    void persistSupplementEvent(tabId, eventId, data as Partial<ProbeEvent>);
   }
 
   stop(): DiagnosisSession | null {
@@ -141,6 +194,7 @@ export class Recorder {
   reset(): void {
     this.session = null;
     this.buffer.clear();
+    this.autoObserveBuffer.clear();
     // 清理持久化镜像（按最近会话的 tabId），避免跨会话残留
     if (this.lastTabId !== null) {
       void clearSession(this.lastTabId);

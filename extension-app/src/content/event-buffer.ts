@@ -16,6 +16,8 @@ function categorize(event: ProbeEvent): EventCategory {
       return 'error';
     case 'bridge':
       return 'bridge';
+    case 'performance':
+      return 'other';
     default:
       return 'other';
   }
@@ -27,6 +29,7 @@ export interface BufferStats {
   network: number;
   error: number;
   bridge: number;
+  performance: number;
 }
 
 export class EventBuffer {
@@ -52,6 +55,17 @@ export class EventBuffer {
     this.events.push(event);
   }
 
+  /**
+   * 按 eventId 补充事件字段（如 stackTrace / scopeVariables）。
+   * 用于 CDP 捕获数据异步到达后合并到原始点击事件。
+   */
+  supplement(eventId: string, data: Partial<ProbeEvent>): void {
+    const event = this.events.find((e) => e.eventId === eventId);
+    if (event) {
+      Object.assign(event, data);
+    }
+  }
+
   snapshot(): ProbeEvent[] {
     return [...this.events];
   }
@@ -75,6 +89,7 @@ export class EventBuffer {
       network: 0,
       error: 0,
       bridge: 0,
+      performance: 0,
     };
     for (const e of this.events) {
       const cat = categorize(e);

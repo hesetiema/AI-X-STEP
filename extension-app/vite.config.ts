@@ -14,6 +14,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
+      input: {
+        workbench: resolve(__dirname, 'src/workbench/index.html'),
+      },
       output: {
         chunkFileNames: 'chunks/[name]-[hash].js',
       },

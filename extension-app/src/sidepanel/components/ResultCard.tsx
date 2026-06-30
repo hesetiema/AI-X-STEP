@@ -32,21 +32,30 @@ const ResultCard: React.FC = () => {
               {uploadResult.taskId.slice(0, 16)}...
             </code>
           </div>
-          <a
-            href={`http://localhost:4220/?taskId=${encodeURIComponent(uploadResult.taskId)}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => {
+              const chromeAPI = (window as any).chrome;
+              const url =
+                chromeAPI.runtime.getURL('src/workbench/index.html') +
+                `?taskId=${encodeURIComponent(uploadResult.taskId!)}`;
+              chromeAPI.windows.create({ url, type: 'popup', width: 900, height: 700 });
+            }}
             style={{
               display: 'inline-block',
               marginTop: SPACING.md,
               fontSize: 13,
               fontWeight: 600,
               color: COLORS.primary,
-              textDecoration: 'none',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              fontFamily: 'inherit',
             }}
           >
             打开工作台 →
-          </a>
+          </button>
         </>
       )}
       {!isSuccess && uploadResult.error && (

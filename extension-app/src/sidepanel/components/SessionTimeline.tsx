@@ -226,7 +226,7 @@ const SessionTimeline: React.FC = () => {
         })}
       </div>
 
-      <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div className="timeline-scroll" style={{ maxHeight: 400, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 4 }}>
         {visibleRows.map((row, idx) => {
           const kind = row.kind;
           const badge =
@@ -236,7 +236,7 @@ const SessionTimeline: React.FC = () => {
               key={idx}
               style={{
                 display: 'flex',
-                alignItems: 'flex-start',
+                alignItems: 'center',
                 gap: SPACING.sm,
                 fontSize: 12,
                 padding: '3px 0',
@@ -252,7 +252,7 @@ const SessionTimeline: React.FC = () => {
               <span style={{ flexShrink: 0, fontSize: 10, color: COLORS.textSecondary, padding: '1px 4px', background: COLORS.surface, borderRadius: 3 }}>
                 {KIND_LABEL[kind] ?? kind}
               </span>
-              <span style={{ color: COLORS.text, wordBreak: 'break-all', flex: 1 }}>
+              <span style={{ color: COLORS.text, wordBreak: 'break-all', flex: 1, minWidth: 0 }}>
                 {formatRowText(row)}
               </span>
               {badge && (

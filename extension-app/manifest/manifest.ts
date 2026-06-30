@@ -27,8 +27,14 @@ export default defineManifest({
       run_at: 'document_start',
     },
   ],
-  permissions: ['activeTab', 'storage', 'sidePanel', 'scripting'],
+  permissions: ['activeTab', 'storage', 'sidePanel', 'scripting', 'debugger'],
   host_permissions: ['<all_urls>'],
+  web_accessible_resources: [
+    {
+      resources: ['src/workbench/index.html'],
+      matches: ['<all_urls>'],
+    },
+  ],
   icons: {
     '16': 'public/icon-16.png',
     '48': 'public/icon-48.png',

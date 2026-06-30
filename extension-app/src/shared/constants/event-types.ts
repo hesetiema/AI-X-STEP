@@ -15,4 +15,5 @@ export const EVIDENCE_TYPE_MAP = {
   error: 'frontend_error',
   bridge: 'bridge_event',
   observation: 'observation',
+  performance: 'performance_event',
 } as const;

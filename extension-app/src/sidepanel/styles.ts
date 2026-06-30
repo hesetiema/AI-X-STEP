@@ -21,6 +21,9 @@ export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20 } as const;
 export const panelStyles = {
   container: {
     width: 360,
+    maxWidth: '100%',
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
     minHeight: '100vh',
     background: COLORS.bg,
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',

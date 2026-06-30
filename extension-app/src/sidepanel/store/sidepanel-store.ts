@@ -2,7 +2,7 @@
 // SidePanel 状态 —— 实时事件流 + 用户备注
 
 import { create } from 'zustand';
-import type { SessionStatus, SessionStats, ProbeEvent, UploadResult } from '@/shared/types';
+import type { SessionStatus, SessionStats, ProbeEvent, UploadResult, PagePerfSummary } from '@/shared/types';
 
 interface SidePanelState {
   status: SessionStatus;
@@ -10,6 +10,8 @@ interface SidePanelState {
   events: ProbeEvent[];
   userHint: { summary: string; expected: string; actual: string };
   uploadResult: UploadResult | null;
+  deepDiagnosis: boolean;
+  pagePerf: PagePerfSummary | null;
 
   setStatus: (status: SessionStatus) => void;
   setStats: (stats: SessionStats) => void;
@@ -18,6 +20,8 @@ interface SidePanelState {
   clearEvents: () => void;
   setUserHint: (hint: Partial<SidePanelState['userHint']>) => void;
   setUploadResult: (result: UploadResult) => void;
+  toggleDeepDiagnosis: () => void;
+  setPagePerf: (perf: PagePerfSummary | null) => void;
   reset: () => void;
 }
 
@@ -27,6 +31,8 @@ export const useSidePanelStore = create<SidePanelState>((set) => ({
   events: [],
   userHint: { summary: '', expected: '', actual: '' },
   uploadResult: null,
+  deepDiagnosis: false,
+  pagePerf: null,
 
   setStatus: (status) => set({ status }),
   setStats: (stats) => set({ stats }),
@@ -36,6 +42,9 @@ export const useSidePanelStore = create<SidePanelState>((set) => ({
   setUserHint: (hint) =>
     set((s) => ({ userHint: { ...s.userHint, ...hint } })),
   setUploadResult: (result) => set({ uploadResult: result }),
+  toggleDeepDiagnosis: () =>
+    set((s) => ({ deepDiagnosis: !s.deepDiagnosis })),
+  setPagePerf: (pagePerf) => set({ pagePerf }),
   reset: () =>
     set({
       status: 'idle',
@@ -43,5 +52,7 @@ export const useSidePanelStore = create<SidePanelState>((set) => ({
       events: [],
       userHint: { summary: '', expected: '', actual: '' },
       uploadResult: null,
+      deepDiagnosis: false,
+      pagePerf: null,
     }),
 }));

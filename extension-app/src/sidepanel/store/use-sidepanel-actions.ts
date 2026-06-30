@@ -38,27 +38,25 @@ function sendMessage<T = unknown>(message: unknown): Promise<T> {
 
 export function useSidePanelActions() {
   const setStatus = useSidePanelStore((s) => s.setStatus);
-  const setStats = useSidePanelStore((s) => s.setStats);
   const setEvents = useSidePanelStore((s) => s.setEvents);
-  const clearEvents = useSidePanelStore((s) => s.clearEvents);
   const setUploadResult = useSidePanelStore((s) => s.setUploadResult);
   const reset = useSidePanelStore((s) => s.reset);
+  const deepDiagnosis = useSidePanelStore((s) => s.deepDiagnosis);
+  const toggleDeepDiagnosis = useSidePanelStore((s) => s.toggleDeepDiagnosis);
 
   const startRecording = useCallback(async () => {
     try {
       reset();
-      clearEvents();
       const res = await sendMessage<{ ok: boolean; meta: TabMeta }>({
         type: 'START_RECORDING',
       });
       if (res.ok) {
         setStatus('recording');
-        if (res.meta?.stats) setStats(res.meta.stats);
       }
     } catch (err) {
       console.error('[TraceLens] startRecording error', err);
     }
-  }, [reset, clearEvents, setStatus, setStats]);
+  }, [reset, setStatus]);
 
   const resumeRecording = useCallback(async () => {
     try {
@@ -67,12 +65,11 @@ export function useSidePanelActions() {
       });
       if (res.ok) {
         setStatus('recording');
-        if (res.meta?.stats) setStats(res.meta.stats);
       }
     } catch (err) {
       console.error('[TraceLens] resumeRecording error', err);
     }
-  }, [setStatus, setStats]);
+  }, [setStatus]);
 
   const stopRecording = useCallback(async () => {
     try {
@@ -81,16 +78,29 @@ export function useSidePanelActions() {
       });
       if (res.ok) {
         setStatus('stopped');
-        if (res.meta?.stats) setStats(res.meta.stats);
+      }
+      // 停止后立即拉一次最终事件列表到侧边栏
+      const eventsRes = await sendMessage<EventsResponse>({
+        type: 'FETCH_EVENTS',
+      });
+      if (eventsRes.ok && eventsRes.events) {
+        setEvents(eventsRes.events);
       }
     } catch (err) {
       console.error('[TraceLens] stopRecording error', err);
     }
-  }, [setStatus, setStats]);
+  }, [setStatus, setEvents]);
 
   const submitDiagnosis = useCallback(async () => {
     try {
       setStatus('uploading');
+      const userHint = useSidePanelStore.getState().userHint;
+      if (userHint.summary || userHint.expected || userHint.actual) {
+        await sendMessage({
+          type: 'SET_USER_HINT',
+          userHint,
+        });
+      }
       const res = await sendMessage<{
         ok: boolean;
         result: UploadResult;
@@ -108,10 +118,6 @@ export function useSidePanelActions() {
     }
   }, [setStatus, setUploadResult]);
 
-  /**
-   * 从 background 恢复当前 tab 的完整状态。
-   * SidePanel 每次打开时调用。
-   */
   const restoreStatus = useCallback(async () => {
     try {
       const res = await sendMessage<StatusResponse>({
@@ -119,28 +125,22 @@ export function useSidePanelActions() {
       });
       if (res.ok && res.meta) {
         setStatus(res.meta.status);
-        if (res.meta.stats) setStats(res.meta.stats);
         if (res.meta.lastUpload) setUploadResult(res.meta.lastUpload);
+      }
+      // 同时拉取事件列表
+      const eventsRes = await sendMessage<EventsResponse>({
+        type: 'FETCH_EVENTS',
+      });
+      if (eventsRes.ok && eventsRes.events) {
+        setEvents(eventsRes.events);
       }
     } catch {
       // background 未就绪时静默忽略
     }
-  }, [setStatus, setStats, setUploadResult]);
+  }, [setStatus, setUploadResult, setEvents]);
 
-  /**
-   * 刷新事件统计 + 拉取最新事件列表。
-   * 录制中每 2 秒调用，让 SidePanel 实时展示事件流。
-   */
   const refreshStats = useCallback(async () => {
     try {
-      // 先刷新 background 侧的 stats
-      const statsRes = await sendMessage<StatusResponse>({
-        type: 'GET_SESSION_STATUS',
-      });
-      if (statsRes.ok && statsRes.meta?.stats) {
-        setStats(statsRes.meta.stats);
-      }
-      // 再向 content script 拉取最新事件快照
       const eventsRes = await sendMessage<EventsResponse>({
         type: 'FETCH_EVENTS',
       });
@@ -150,7 +150,23 @@ export function useSidePanelActions() {
     } catch {
       // ignore
     }
-  }, [setStats, setEvents]);
+  }, [setEvents]);
+
+  const toggleDeep = useCallback(async () => {
+    const current = useSidePanelStore.getState().deepDiagnosis;
+    const next = !current;
+    toggleDeepDiagnosis();
+    try {
+      if (next) {
+        await sendMessage({ type: 'ENABLE_DEEP_DIAGNOSIS' });
+      } else {
+        await sendMessage({ type: 'DISABLE_DEEP_DIAGNOSIS' });
+      }
+    } catch (err) {
+      console.error('[TraceLens] deep diagnosis toggle error', err);
+      toggleDeepDiagnosis();
+    }
+  }, [toggleDeepDiagnosis]);
 
   return {
     startRecording,
@@ -159,5 +175,7 @@ export function useSidePanelActions() {
     submitDiagnosis,
     restoreStatus,
     refreshStats,
+    deepDiagnosis,
+    toggleDeepDiagnosis: toggleDeep,
   };
 }

@@ -37,7 +37,7 @@ src/
 
 ## 后端对接
 
-诊断服务：`traceLens-server`（NestJS，端口 4220）
+诊断服务：`traceLens-server`（NestJS，端口 8080）
 
-- `POST http://localhost:4220/api/v1/diagnosis` — 提交诊断会话
-- `GET  http://localhost:4220/api/v1/diagnosis/:taskId` — 查询诊断结果
+- `POST http://localhost:8080/api/v1/diagnosis` — 提交诊断会话
+- `GET  http://localhost:8080/api/v1/diagnosis/:taskId` — 查询诊断结果

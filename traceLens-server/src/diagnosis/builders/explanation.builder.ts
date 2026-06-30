@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DiagnosisConclusion, DiagnosisExplanation, RankedFinding, DominoChain } from '../interfaces/diagnosis.types';
+import { DiagnosisConclusion, DiagnosisExplanation, DominoChain, LlmDiagnosisResult, RankedFinding } from '../interfaces/diagnosis.types';
 
 @Injectable()
 export class ExplanationBuilder {
@@ -7,12 +7,20 @@ export class ExplanationBuilder {
     conclusion: DiagnosisConclusion,
     rankedFindings: RankedFinding[],
     dominoChain: DominoChain,
+    llmResult?: LlmDiagnosisResult | null,
   ): DiagnosisExplanation {
+    const ruleAdvice = this.buildAdvice(conclusion);
+    const llmAdvice = llmResult?.advice ?? [];
     return {
       summaryText: this.buildSummary(conclusion),
       evidenceNarrative: this.buildNarrative(rankedFindings),
-      operatorAdvice: this.buildAdvice(conclusion),
+      operatorAdvice: llmAdvice.length > 0 ? [...llmAdvice, ...ruleAdvice] : ruleAdvice,
       symptomNotes: this.buildSymptomNotes(rankedFindings),
+      llmNarrative: llmResult?.narrative,
+      brokenStage: llmResult?.brokenStage,
+      hypotheses: llmResult?.hypotheses,
+      llmConfidence: llmResult?.confidence,
+      llmModel: llmResult?.model,
     };
   }
 

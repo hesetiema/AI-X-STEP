@@ -2,6 +2,7 @@
 
 export * from './diagnosis-session';
 export * from './probe-event';
+export * from './dom-context';
 export * from './network';
 export * from './runtime-message';
 export * from './api';
