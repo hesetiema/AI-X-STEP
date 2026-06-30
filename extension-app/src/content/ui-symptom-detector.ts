@@ -5,6 +5,7 @@
 import type { ObservationEvent, UiStateEvent } from '@/shared/types';
 import type { Recorder } from './recorder';
 import { RECORDER_CONFIG } from '@/shared/constants';
+import { getInitWindowTracker } from './init-window-tracker';
 
 const EMPTY_STATE_PATTERNS = [
   /暂无数据/i,
@@ -64,7 +65,6 @@ export class UiSymptomDetector {
     }
 
     this.observer = new MutationObserver((mutations) => {
-      if (!this.recorder.isActive) return;
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
           if (node instanceof HTMLElement) {
@@ -88,6 +88,9 @@ export class UiSymptomDetector {
     const text = el.textContent ?? '';
     for (const pattern of EMPTY_STATE_PATTERNS) {
       if (pattern.test(text)) {
+        const tracker = getInitWindowTracker();
+        if (tracker) tracker.onSymptom('empty_state', undefined, text.slice(0, 100));
+        if (!this.recorder.isActive) return;
         this.emitObservation('module_empty_after_success', {
           detail: { text: text.slice(0, 100), selector: getSelector(el) },
         });
@@ -100,6 +103,9 @@ export class UiSymptomDetector {
     const text = el.textContent ?? '';
     for (const pattern of ERROR_TOAST_PATTERNS) {
       if (pattern.test(text)) {
+        const tracker = getInitWindowTracker();
+        if (tracker) tracker.onSymptom('error_toast', undefined, text.slice(0, 100));
+        if (!this.recorder.isActive) return;
         this.emitUiState('error_toast', {
           message: text.slice(0, 100),
           severity: 'error',
@@ -137,13 +143,17 @@ export class UiSymptomDetector {
       const el = document.querySelector(p.selector);
       if (!el) return false;
       if (now - p.startedAt >= RECORDER_CONFIG.LONG_LOADING_THRESHOLD_MS) {
-        this.emitObservation('module_loading_too_long', {
-          module: p.selector,
-          detail: {
-            selector: p.selector,
-            durationMs: now - p.startedAt,
-          },
-        });
+        const tracker = getInitWindowTracker();
+        if (tracker) tracker.onSymptom('skeleton_too_long', p.selector, undefined);
+        if (this.recorder.isActive) {
+          this.emitObservation('module_loading_too_long', {
+            module: p.selector,
+            detail: {
+              selector: p.selector,
+              durationMs: now - p.startedAt,
+            },
+          });
+        }
         return false; // 只报告一次
       }
       return true;

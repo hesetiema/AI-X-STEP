@@ -22,6 +22,8 @@ import { DefaultNetworkInsightTransformer } from './network-insight-transformer'
 
 const MESSAGE_SOURCE = 'tracelens-main-world';
 
+import { getInitWindowTracker } from '../init-window-tracker';
+
 interface MainWorldNetworkEvent {
   source: string;
   requestId: string;
@@ -120,8 +122,13 @@ export class NetworkObserver {
       insight = this.transformer.transform(ctx);
     }
 
-    if (!this.recorder.isActive) return;
+    // 通知 init-window-tracker（始终触发，不依赖录制状态）
+    if (insight) {
+      const tracker = getInitWindowTracker();
+      if (tracker) tracker.onNetworkInsight(insight);
+    }
 
+    // 构建网络事件（供 autoObserve + 手动 buffer 共用）
     const event: Omit<NetworkEvent, 'eventId' | 'occurredAt' | 'tabId'> = {
       kind: 'network',
       requestId: normalized.requestId,
@@ -141,6 +148,12 @@ export class NetworkObserver {
           }
         : undefined,
     };
+
+    // 写入 autoObserve buffer（始终写入，供一键诊断消费）
+    this.recorder.appendAutoObserve(event);
+
+    // 写入手动 buffer（仅在录制时）
+    if (!this.recorder.isActive) return;
     this.recorder.append(event);
   }
 }

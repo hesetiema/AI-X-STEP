@@ -3,6 +3,7 @@
 
 import type { UiEvent } from '@/shared/types';
 import type { Recorder } from './recorder';
+import { getInitWindowTracker } from './init-window-tracker';
 
 export class RouteObserver {
   private patched = false;
@@ -51,6 +52,11 @@ export class RouteObserver {
     const route = location.pathname + location.search;
     if (route === this.lastRoute) return;
     this.lastRoute = route;
+
+    const tracker = getInitWindowTracker();
+    if (tracker) {
+      tracker.onRouteEnter(route, location.href);
+    }
 
     if (!this.recorder.isActive) return;
 

@@ -3,6 +3,7 @@
 
 import { BRIDGE_CONTEXT_KEY, BRIDGE_EVENT_NAMES } from '@/shared/constants';
 import type { Recorder } from './recorder';
+import { getInitWindowTracker } from './init-window-tracker';
 
 export class BridgeListener {
   private contextHandler: (() => void) | null = null;
@@ -29,6 +30,24 @@ export class BridgeListener {
     };
     this.stateHandler = (e: CustomEvent) => {
       const detail = e.detail as Record<string, unknown> | undefined;
+      const tracker = getInitWindowTracker();
+      if (tracker && detail) {
+        const stateType = detail.stateType as string | undefined;
+        const module = detail.module as string | undefined;
+        if (stateType === 'init_started' && module) {
+          tracker.onBridgeInitStarted(module, location.href);
+        } else if (stateType === 'init_completed' && module) {
+          tracker.onBridgeInitCompleted(module);
+        } else if (stateType === 'loading' && module) {
+          tracker.onBridgeModuleLoading(module, detail.isCritical === true);
+        } else if (stateType === 'rendered' && module) {
+          tracker.onBridgeModuleRendered(
+            module,
+            detail.isCritical === true,
+            detail.itemCount as number | undefined,
+          );
+        }
+      }
       this.emitBridge('state', {
         stateType: detail?.stateType as string | undefined,
         module: detail?.module as string | undefined,
