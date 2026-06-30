@@ -61,6 +61,27 @@ export class PerformanceObserver_ {
     private readonly onFirstScreenReady?: (event: PerfEventType, summary: PagePerfSummary) => void,
   ) {}
 
+  /** 路由变化时重置指标，重新采集新页面的性能数据 */
+  onRouteChange(): void {
+    if (!this.firstScreenEmitted) return;
+    this.resetMetrics();
+    this.startStableGapDetection();
+    this.scheduleFallbackEmit();
+  }
+
+  private resetMetrics(): void {
+    this.firstScreenEmitted = false;
+    this.lcpValue = 0;
+    this.fcpValue = 0;
+    this.ttfbValue = 0;
+    this.clsValue = 0;
+    this.domContentLoaded = 0;
+    this.loadComplete = 0;
+    this.trackedApis = [];
+    this.lastMutationTime = Date.now();
+    this.captureNavigationTiming();
+  }
+
   start(): void {
     if (this.observer) return;
     this.firstScreenEmitted = false;

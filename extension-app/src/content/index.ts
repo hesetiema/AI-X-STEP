@@ -25,6 +25,7 @@ setInitWindowTracker(initWindowTracker);
 const perfObserver = new PerfObserver(recorder, (event, summary) => {
   initWindowTracker.onFirstScreenReady(event, summary);
 });
+routeObserver.onRouteChange(() => perfObserver.onRouteChange());
 
 async function startRecording(): Promise<void> {
   if (recorder.isActive) return;

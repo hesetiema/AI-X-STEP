@@ -11,8 +11,13 @@ export class RouteObserver {
   private originalReplaceState: typeof history.replaceState | null = null;
   private popstateHandler: (() => void) | null = null;
   private lastRoute: string | null = null;
+  private onRouteChangeCallback: (() => void) | null = null;
 
   constructor(private readonly recorder: Recorder) {}
+
+  onRouteChange(callback: () => void): void {
+    this.onRouteChangeCallback = callback;
+  }
 
   start(): void {
     if (this.patched) return;
@@ -56,6 +61,10 @@ export class RouteObserver {
     const tracker = getInitWindowTracker();
     if (tracker) {
       tracker.onRouteEnter(route, location.href);
+    }
+
+    if (this.onRouteChangeCallback) {
+      this.onRouteChangeCallback();
     }
 
     if (!this.recorder.isActive) return;
