@@ -7,6 +7,7 @@ import type { RuntimeMessage, UploadResult } from '@/shared/types';
 import { deepDiagnosis } from './cdp-stack-capturer';
 import { loadSession, clearSession } from '@/shared/storage/session-store';
 import { createDiagnosis } from '@/shared/api';
+import { EVIDENCE_TYPE_MAP } from '@/shared/constants';
 
 // 处理来自 popup / sidepanel / content script 的消息
 chrome.runtime.onMessage.addListener(
@@ -151,48 +152,79 @@ async function handleMessage(message: RuntimeMessage, sender: chrome.runtime.Mes
     }
     case 'DIAGNOSE_PAGE_LOAD': {
       const tabId = await resolveActiveTabId(message.tabId);
-      // 请求 content script 提供 autoObserve 缓冲区中的 performance + network 事件
       try {
-        const response = await chrome.tabs.sendMessage(tabId, {
-          type: 'FETCH_AUTO_OBSERVE',
-        });
-        if (response && response.ok && response.events) {
-          const events = response.events as Array<Record<string, unknown>>;
-          const title = (await chrome.tabs.get(tabId)).title ?? 'Unknown';
-          const url = (await chrome.tabs.get(tabId)).url ?? '';
+        const [autoRes, initRes] = await Promise.all([
+          chrome.tabs.sendMessage(tabId, { type: 'FETCH_AUTO_OBSERVE' }),
+          chrome.tabs.sendMessage(tabId, { type: 'FETCH_INIT_WINDOW' }).catch(() => null),
+        ]);
 
-          const dto = {
-            appId: 'diagnosis-extension',
-            pageUrl: url,
-            title,
-            evidence: events.map((e) => ({
-              id: e.eventId ?? crypto.randomUUID(),
-              type: e.kind === 'performance'
-                ? 'performance_event'
-                : e.kind === 'network'
-                ? 'network_event'
-                : 'ui_event',
-              label:
-                e.kind === 'performance'
-                  ? `performance:${(e as Record<string,unknown>).perfType ?? 'first_screen_complete'}`
-                  : e.kind === 'network'
-                  ? `${(e as Record<string,unknown>).method ?? 'GET'} ${(e as Record<string,unknown>).url ?? ''}`
-                  : `${e.kind ?? 'unknown'}`,
-              value: e as Record<string, unknown>,
-              source: 'auto-observe',
-              timestamp: new Date().toISOString(),
-            })),
-          };
-          const task = await createDiagnosis(dto as unknown as import('@/shared/types').CreateDiagnosisDto);
-
-          // 打开工作台查看结果
-          await chrome.tabs.create({
-            url: chrome.runtime.getURL('src/workbench/index.html') + `?taskId=${task.taskId}`,
-          });
-
-          return { ok: true, taskId: task.taskId };
+        if (!autoRes || !autoRes.ok || !autoRes.events) {
+          return { ok: false, error: 'no auto-observe events' };
         }
-        return { ok: false, error: 'no auto-observe events' };
+
+        const events = autoRes.events as Array<Record<string, unknown>>;
+        const tabInfo = await chrome.tabs.get(tabId);
+        const title = tabInfo.title ?? 'Unknown';
+        const url = tabInfo.url ?? '';
+        const initWindow = initRes?.window as Record<string, unknown> | null;
+
+        const evidence = events.map((e) => {
+          const detail = e.detail as Record<string, unknown> | undefined;
+          const isInitObs = e.kind === 'observation' && detail?.initObservation;
+          const initObs = isInitObs ? detail!.initObservation as Record<string, unknown> : undefined;
+
+          return {
+            id: e.eventId ?? crypto.randomUUID(),
+            type: isInitObs
+              ? 'init_observation'
+              : e.kind === 'performance'
+              ? 'performance_event'
+              : e.kind === 'network'
+              ? 'network_event'
+              : EVIDENCE_TYPE_MAP[e.kind as keyof typeof EVIDENCE_TYPE_MAP] ?? 'ui_event',
+            label: isInitObs
+              ? `init_observation:${initObs!.type ?? 'unknown'}`
+              : e.kind === 'performance'
+              ? `performance:${(e as Record<string, unknown>).perfType ?? 'first_screen_complete'}`
+              : e.kind === 'network'
+              ? `${(e as Record<string, unknown>).method ?? 'GET'} ${(e as Record<string, unknown>).url ?? ''}`
+              : `${e.kind ?? 'unknown'}`,
+            value: isInitObs ? initObs! : e as Record<string, unknown>,
+            source: 'auto-observe',
+            timestamp: e.occurredAt ? new Date(e.occurredAt as number).toISOString() : new Date().toISOString(),
+          };
+        });
+
+        const symptoms = evidence
+          .filter((ev) => ev.type === 'init_observation')
+          .map((ev) => ev.value as Record<string, unknown>)
+          .filter((v) => v.type === 'init_symptom')
+          .map((v) => `${v.symptom}${v.module ? `(${v.module})` : ''}`);
+
+        const initDuration = initWindow && initWindow.completedAt && initWindow.startedAt
+          ? Number(initWindow.completedAt) - Number(initWindow.startedAt)
+          : null;
+
+        const dto = {
+          appId: 'diagnosis-extension',
+          pageUrl: url,
+          title: initWindow
+            ? `页面初始化性能排查 - ${initWindow.page ?? url}`
+            : title,
+          description: initWindow
+            ? `初始化耗时 ${initDuration ?? '?'}ms，结束原因：${initWindow.endReason ?? 'unknown'}`
+            : undefined,
+          evidence,
+          symptoms: symptoms.length > 0 ? symptoms : undefined,
+        };
+
+        const task = await createDiagnosis(dto as unknown as import('@/shared/types').CreateDiagnosisDto);
+
+        await chrome.tabs.create({
+          url: chrome.runtime.getURL('src/workbench/index.html') + `?taskId=${task.taskId}`,
+        });
+
+        return { ok: true, taskId: task.taskId };
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) };
       }
