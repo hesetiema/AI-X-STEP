@@ -57,19 +57,19 @@ const RecordControls: React.FC = () => {
 
   const btnBase: React.CSSProperties = {
     width: '100%',
-    padding: `${SPACING.md}px ${SPACING.lg}px`,
-    fontSize: 14,
+    padding: `${SPACING.sm}px ${SPACING.md}px`,
+    fontSize: 13,
     fontWeight: 600,
     color: '#fff',
     border: 'none',
-    borderRadius: 8,
+    borderRadius: 6,
     cursor: primaryDisabled ? 'not-allowed' : 'pointer',
     opacity: primaryDisabled ? 0.6 : 1,
     transition: 'background 0.15s',
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.xs }}>
       {/* 主按钮 */}
       <button
         onClick={primaryAction}
@@ -77,7 +77,7 @@ const RecordControls: React.FC = () => {
         style={{ ...btnBase, background: primaryColor }}
       >
         {isRecording && (
-          <span style={{ marginRight: 8, display: 'inline-block' }}>●</span>
+          <span style={{ marginRight: 6, display: 'inline-block' }}>●</span>
         )}
         {primaryLabel}
       </button>
@@ -90,8 +90,6 @@ const RecordControls: React.FC = () => {
             style={{
               ...btnBase,
               background: COLORS.primary,
-              padding: `${SPACING.sm}px`,
-              fontSize: 13,
             }}
           >
             继续诊断
@@ -103,8 +101,6 @@ const RecordControls: React.FC = () => {
               background: 'transparent',
               color: COLORS.muted,
               border: `1px solid ${COLORS.border}`,
-              padding: `${SPACING.sm}px`,
-              fontSize: 12,
             }}
           >
             开始新诊断
@@ -120,8 +116,6 @@ const RecordControls: React.FC = () => {
             style={{
               ...btnBase,
               background: COLORS.primary,
-              padding: `${SPACING.sm}px`,
-              fontSize: 13,
             }}
           >
             继续录制
@@ -133,8 +127,6 @@ const RecordControls: React.FC = () => {
               background: 'transparent',
               color: COLORS.muted,
               border: `1px solid ${COLORS.border}`,
-              padding: `${SPACING.sm}px`,
-              fontSize: 12,
             }}
           >
             开始新诊断
