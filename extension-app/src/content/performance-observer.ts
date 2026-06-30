@@ -7,6 +7,8 @@
 import type { PerformanceEvent, FirstScreenApiSummary } from '@/shared/types';
 import type { Recorder } from './recorder';
 import { RECORDER_CONFIG } from '@/shared/constants';
+import { buildPagePerfSummary, notifyPerfUpdate } from './perf-bridge';
+import type { PerformanceEvent as PerfEventType, PagePerfSummary } from '@/shared/types';
 
 const MESSAGE_SOURCE = 'tracelens-main-world';
 
@@ -54,7 +56,10 @@ export class PerformanceObserver_ {
 
   private messageHandler: ((e: MessageEvent) => void) | null = null;
 
-  constructor(private readonly recorder: Recorder) {}
+  constructor(
+    private readonly recorder: Recorder,
+    private readonly onFirstScreenReady?: (event: PerfEventType, summary: PagePerfSummary) => void,
+  ) {}
 
   start(): void {
     if (this.observer) return;
@@ -250,5 +255,23 @@ export class PerformanceObserver_ {
 
     // 始终通过 auto-observe 写入，不依赖 manual recording
     this.recorder.appendAutoObserve(event);
+
+    // 构造完整 PerformanceEvent（补齐 BaseProbeEvent 字段）供 perf-bridge 使用
+    const perfEvent: PerfEventType = {
+      ...event,
+      eventId: '',
+      occurredAt: Date.now(),
+      tabId: 0,
+    };
+    const summary = buildPagePerfSummary(perfEvent);
+
+    // 通知 init-window-tracker（窗口结束兜底信号）
+    if (this.onFirstScreenReady) {
+      this.onFirstScreenReady(perfEvent, summary);
+    }
+
+    // 发送 PERF_UPDATE 到 background → sidepanel（修复死链）
+    const tabId = this.recorder['lastTabId'] ?? this.recorder['autoTabId'] ?? 0;
+    notifyPerfUpdate(summary, tabId);
   }
 }
