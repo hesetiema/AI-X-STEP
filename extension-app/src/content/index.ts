@@ -9,6 +9,7 @@ import { NetworkObserver } from './network';
 import { BridgeListener } from './bridge-listener';
 import { UiSymptomDetector } from './ui-symptom-detector';
 import { PerformanceObserver_ as PerfObserver } from './performance-observer';
+import { InitWindowTracker, setInitWindowTracker } from './init-window-tracker';
 import { readPageContext } from './page-context-reader';
 import { loadSession } from '@/shared/storage/session-store';
 import type { RuntimeMessage, DiagnosisSession, UserHint } from '@/shared/types';
@@ -19,7 +20,11 @@ const routeObserver = new RouteObserver(recorder);
 const networkObserver = new NetworkObserver(recorder);
 const bridgeListener = new BridgeListener(recorder);
 const symptomDetector = new UiSymptomDetector(recorder);
-const perfObserver = new PerfObserver(recorder);
+const initWindowTracker = new InitWindowTracker({ recorder });
+setInitWindowTracker(initWindowTracker);
+const perfObserver = new PerfObserver(recorder, (event, summary) => {
+  initWindowTracker.onFirstScreenReady(event, summary);
+});
 
 async function startRecording(): Promise<void> {
   if (recorder.isActive) return;
@@ -43,6 +48,7 @@ function stopRecording(): void {
   bridgeListener.stop();
   symptomDetector.stop();
   perfObserver.stop();
+  initWindowTracker.stop();
   const session = recorder.stop();
   console.log('[TraceLens] recording stopped', session?.events.length ?? 0, 'events');
 }
@@ -108,6 +114,7 @@ function startAllObservers(): void {
   bridgeListener.start();
   symptomDetector.start();
   perfObserver.start();
+  initWindowTracker.start();
 }
 
 void initFromPersistedSession();
@@ -160,6 +167,8 @@ async function handleContentMessage(message: RuntimeMessage): Promise<unknown> {
       return { ok: true };
     case 'FETCH_AUTO_OBSERVE':
       return { ok: true, events: recorder.getAutoObserveSnapshot() };
+    case 'FETCH_INIT_WINDOW':
+      return { ok: true, window: initWindowTracker.getCurrentWindow() };
     default:
       return { ok: false, error: 'unknown message type' };
   }
