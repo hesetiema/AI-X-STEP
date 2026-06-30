@@ -111,7 +111,10 @@ export interface ObservationEvent extends BaseProbeEvent {
 
 export interface PerformanceEvent extends BaseProbeEvent {
   kind: 'performance';
-  perfType: 'first_screen_complete';
+  perfType:
+    | 'first_screen_complete'
+    | 'init_window_started'
+    | 'init_window_completed';
   pageUrl: string;
   timing: {
     fcp?: number;
@@ -126,6 +129,7 @@ export interface PerformanceEvent extends BaseProbeEvent {
   };
   firstScreenApis?: FirstScreenApiSummary[];
   navigationalType?: 'navigate' | 'reload' | 'back_forward' | 'prerender';
+  initWindowId?: string;
 }
 
 export interface FirstScreenApiSummary {

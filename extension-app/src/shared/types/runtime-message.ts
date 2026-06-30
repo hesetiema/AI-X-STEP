@@ -22,7 +22,9 @@ export type RuntimeMessage =
   | { type: 'TAB_SWITCHED'; tabId: number } // background -> side panel: 用户切换了 tab
   | { type: 'PERF_UPDATE'; tabId: number; perf: PagePerfSummary } // content -> side panel: 页面性能摘要更新
   | { type: 'DIAGNOSE_PAGE_LOAD'; tabId: number } // side panel -> background: 触发按需页面加载诊断
-  | { type: 'FETCH_AUTO_OBSERVE' }; // background -> content: 获取自动观察缓冲区快照
+  | { type: 'FETCH_AUTO_OBSERVE' } // background -> content: 获取自动观察缓冲区快照
+  | { type: 'FETCH_INIT_WINDOW' } // background -> content: 获取初始化窗口数据
+  | { type: 'INIT_WINDOW_RESULT'; tabId: number; window: import('./init-perf').InitWindow | null }; // content -> background: 返回初始化窗口
 
 export interface SessionStats {
   total: number;

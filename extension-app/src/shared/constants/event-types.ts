@@ -16,4 +16,5 @@ export const EVIDENCE_TYPE_MAP = {
   bridge: 'bridge_event',
   observation: 'observation',
   performance: 'performance_event',
+  init_observation: 'init_observation',
 } as const;
