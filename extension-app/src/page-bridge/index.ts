@@ -56,3 +56,32 @@ export function clearDiagnosisContext(): void {
   const w = window as unknown as Record<string, unknown>;
   delete w[CONTEXT_KEY];
 }
+
+export function emitInitStarted(module: string): void {
+  window.dispatchEvent(new CustomEvent(EVENT_STATE, {
+    detail: { module, stateType: 'init_started' },
+  }));
+}
+
+export function emitInitCompleted(module: string): void {
+  window.dispatchEvent(new CustomEvent(EVENT_STATE, {
+    detail: { module, stateType: 'init_completed' },
+  }));
+}
+
+export function emitModuleLoading(module: string, opts?: { isCritical?: boolean }): void {
+  window.dispatchEvent(new CustomEvent(EVENT_STATE, {
+    detail: { module, stateType: 'loading', isCritical: opts?.isCritical ?? false },
+  }));
+}
+
+export function emitModuleRendered(module: string, opts?: { isCritical?: boolean; itemCount?: number }): void {
+  window.dispatchEvent(new CustomEvent(EVENT_STATE, {
+    detail: {
+      module,
+      stateType: 'rendered',
+      isCritical: opts?.isCritical ?? false,
+      itemCount: opts?.itemCount,
+    },
+  }));
+}

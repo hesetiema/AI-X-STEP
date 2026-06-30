@@ -1,7 +1,7 @@
 // PagePerfIndicator.tsx
 // SidePanel 页面性能指示器 —— 展示自动采集的首屏性能摘要，支持按需触发诊断
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSidePanelStore } from '../store';
 import { COLORS, SPACING } from '../styles';
 import type { RuntimeMessage } from '@/shared/types';
@@ -10,33 +10,48 @@ export function formatPageReady(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+type DiagState = 'idle' | 'diagnosing' | 'done' | 'error';
+
 const PagePerfIndicator: React.FC = () => {
   const pagePerf = useSidePanelStore((s) => s.pagePerf);
   const setPagePerf = useSidePanelStore((s) => s.setPagePerf);
   const status = useSidePanelStore((s) => s.status);
+  const [diagState, setDiagState] = useState<DiagState>('idle');
+  const [taskId, setTaskId] = useState<string | null>(null);
 
-  // 监听来自 content script 的性能更新消息
   useEffect(() => {
     const listener = (message: RuntimeMessage) => {
       if (message.type === 'PERF_UPDATE') {
         setPagePerf(message.perf);
+        setDiagState('idle');
+        setTaskId(null);
       }
     };
     chrome.runtime.onMessage.addListener(listener);
     return () => chrome.runtime.onMessage.removeListener(listener);
   }, [setPagePerf]);
 
-  // Tab 切换时重置
   useEffect(() => {
     if (status === 'idle') {
       setPagePerf(null);
+      setDiagState('idle');
+      setTaskId(null);
     }
   }, [status, setPagePerf]);
 
   const handleDiagnose = async () => {
+    setDiagState('diagnosing');
     try {
-      chrome.runtime.sendMessage({ type: 'DIAGNOSE_PAGE_LOAD' });
+      const res = await chrome.runtime.sendMessage({ type: 'DIAGNOSE_PAGE_LOAD' });
+      if (res && res.ok && res.taskId) {
+        setTaskId(res.taskId);
+        setDiagState('done');
+      } else {
+        setDiagState('error');
+        console.error('[TraceLens] diagnosePageLoad failed:', res?.error);
+      }
     } catch (err) {
+      setDiagState('error');
       console.error('[TraceLens] diagnosePageLoad error', err);
     }
   };
@@ -74,7 +89,6 @@ const PagePerfIndicator: React.FC = () => {
         gap: SPACING.sm,
       }}
     >
-      {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm }}>
         <span style={{ fontSize: 14 }}>
           {!pagePerf ? '⏳' : isSlow ? '🐢' : '⚡'}
@@ -93,8 +107,7 @@ const PagePerfIndicator: React.FC = () => {
           )}
         </div>
 
-        {/* Diagnose button — only visible when slow */}
-        {pagePerf && isSlow && (
+        {pagePerf && isSlow && diagState === 'idle' && (
           <button
             onClick={handleDiagnose}
             style={{
@@ -109,12 +122,61 @@ const PagePerfIndicator: React.FC = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            诊断
+            一键排查
+          </button>
+        )}
+
+        {diagState === 'diagnosing' && (
+          <span style={{ fontSize: 12, color: COLORS.textSecondary }}>诊断中...</span>
+        )}
+
+        {diagState === 'done' && taskId && (
+          <button
+            onClick={() => chrome.tabs.create({
+              url: chrome.runtime.getURL('src/workbench/index.html') + `?taskId=${taskId}`,
+            })}
+            style={{
+              padding: '4px 10px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#fff',
+              background: COLORS.success,
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            打开工作台
+          </button>
+        )}
+
+        {diagState === 'error' && (
+          <button
+            onClick={handleDiagnose}
+            style={{
+              padding: '4px 10px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#fff',
+              background: COLORS.warning,
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            重试
           </button>
         )}
       </div>
 
-      {/* Observations */}
+      {pagePerf && isSlow && diagState === 'idle' && (
+        <div style={{ fontSize: 11, color: COLORS.warning }}>
+          ⚠ 页面初始化偏慢，可能存在接口性能问题，点击「一键排查」诊断
+        </div>
+      )}
+
       {pagePerf && pagePerf.observations.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {pagePerf.observations.map((o) => (
