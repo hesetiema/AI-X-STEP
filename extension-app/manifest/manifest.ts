@@ -27,7 +27,7 @@ export default defineManifest({
       run_at: 'document_start',
     },
   ],
-  permissions: ['activeTab', 'storage', 'sidePanel', 'scripting', 'debugger'],
+  permissions: ['activeTab', 'storage', 'sidePanel', 'scripting', 'debugger', 'webRequest'],
   host_permissions: ['<all_urls>'],
   web_accessible_resources: [
     {

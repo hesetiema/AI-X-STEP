@@ -18,13 +18,17 @@ export type RuntimeMessage =
   | { type: 'SET_USER_HINT'; tabId: number; userHint: { summary: string; expected: string; actual: string } }
   | { type: 'ENABLE_DEEP_DIAGNOSIS'; tabId: number }
   | { type: 'DISABLE_DEEP_DIAGNOSIS'; tabId: number }
-  | { type: 'CAPTURE_CLICK_RUNTIME' } // content -> background: 消费最近一次点击的运行时捕获（调用栈+作用域变量）
-  | { type: 'TAB_SWITCHED'; tabId: number } // background -> side panel: 用户切换了 tab
-  | { type: 'PERF_UPDATE'; tabId: number; perf: PagePerfSummary } // content -> side panel: 页面性能摘要更新
-  | { type: 'DIAGNOSE_PAGE_LOAD'; tabId: number } // side panel -> background: 触发按需页面加载诊断
-  | { type: 'FETCH_AUTO_OBSERVE' } // background -> content: 获取自动观察缓冲区快照
-  | { type: 'FETCH_INIT_WINDOW' } // background -> content: 获取初始化窗口数据
-  | { type: 'INIT_WINDOW_RESULT'; tabId: number; window: import('./init-perf').InitWindow | null }; // content -> background: 返回初始化窗口
+  | { type: 'CAPTURE_CLICK_RUNTIME' }
+  | { type: 'TAB_SWITCHED'; tabId: number }
+  | { type: 'PERF_UPDATE'; tabId: number; perf: PagePerfSummary }
+  | { type: 'DIAGNOSE_PAGE_LOAD'; tabId: number }
+  | { type: 'FETCH_AUTO_OBSERVE' }
+  | { type: 'FETCH_INIT_WINDOW' }
+  | { type: 'INIT_WINDOW_RESULT'; tabId: number; window: import('./init-perf').InitWindow | null }
+  // 慢接口监控
+  | { type: 'START_MONITORING'; tabId: number }
+  | { type: 'STOP_MONITORING'; tabId: number }
+  | { type: 'SLOW_API_UPDATE'; tabId: number; api: SlowApiInfo };
 
 export interface SessionStats {
   total: number;
@@ -37,11 +41,12 @@ export interface SessionStats {
 }
 
 export interface SlowApiInfo {
+  requestId: string;
   url: string;
   method: string;
   durationMs: number;
   status?: number;
-  phase: 'slow' | 'error' | 'timeout';
+  phase: 'slow' | 'error' | 'timeout' | 'pending';
 }
 
 export interface PagePerfSummary {

@@ -20,7 +20,8 @@ export function buildPagePerfSummary(event: PerformanceEvent): PagePerfSummary {
       (a): a is typeof a & { phaseDerived: SlowApiInfo['phase'] } =>
         a.phaseDerived === 'slow' || a.phaseDerived === 'error' || a.phaseDerived === 'timeout',
     )
-    .map((a) => ({
+    .map((a, i) => ({
+      requestId: `perf-${i}-${a.url}`,
       url: a.url,
       method: a.method,
       durationMs: a.durationMs,

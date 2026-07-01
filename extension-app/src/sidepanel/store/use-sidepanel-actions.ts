@@ -168,6 +168,30 @@ export function useSidePanelActions() {
     }
   }, [toggleDeepDiagnosis]);
 
+  const setMonitoringStatus = useSidePanelStore((s) => s.setMonitoringStatus);
+  const clearSlowApis = useSidePanelStore((s) => s.clearSlowApis);
+
+  const startMonitoring = useCallback(async () => {
+    try {
+      clearSlowApis();
+      const res = await sendMessage<{ ok: boolean }>({ type: 'START_MONITORING' });
+      if (res.ok) {
+        setMonitoringStatus('monitoring');
+      }
+    } catch (err) {
+      console.error('[TraceLens] startMonitoring error', err);
+    }
+  }, [clearSlowApis, setMonitoringStatus]);
+
+  const stopMonitoring = useCallback(async () => {
+    try {
+      await sendMessage<{ ok: boolean }>({ type: 'STOP_MONITORING' });
+      setMonitoringStatus('stopped');
+    } catch (err) {
+      console.error('[TraceLens] stopMonitoring error', err);
+    }
+  }, [setMonitoringStatus]);
+
   return {
     startRecording,
     stopRecording,
@@ -177,5 +201,7 @@ export function useSidePanelActions() {
     refreshStats,
     deepDiagnosis,
     toggleDeepDiagnosis: toggleDeep,
+    startMonitoring,
+    stopMonitoring,
   };
 }

@@ -1,8 +1,10 @@
 // sidepanel/store/sidepanel-store.ts
-// SidePanel 状态 —— 实时事件流 + 用户备注
+// SidePanel 状态 —— 实时事件流 + 用户备注 + 慢接口监控
 
 import { create } from 'zustand';
-import type { SessionStatus, SessionStats, ProbeEvent, UploadResult, PagePerfSummary } from '@/shared/types';
+import type { SessionStatus, SessionStats, ProbeEvent, UploadResult, PagePerfSummary, SlowApiInfo } from '@/shared/types';
+
+export type MonitoringStatus = 'idle' | 'monitoring' | 'stopped';
 
 interface SidePanelState {
   status: SessionStatus;
@@ -12,6 +14,10 @@ interface SidePanelState {
   uploadResult: UploadResult | null;
   deepDiagnosis: boolean;
   pagePerf: PagePerfSummary | null;
+
+  // 慢接口监控
+  monitoringStatus: MonitoringStatus;
+  slowApis: SlowApiInfo[];
 
   setStatus: (status: SessionStatus) => void;
   setStats: (stats: SessionStats) => void;
@@ -23,6 +29,11 @@ interface SidePanelState {
   toggleDeepDiagnosis: () => void;
   setPagePerf: (perf: PagePerfSummary | null) => void;
   reset: () => void;
+
+  // 慢接口监控 actions
+  setMonitoringStatus: (status: MonitoringStatus) => void;
+  upsertSlowApi: (api: SlowApiInfo) => void;
+  clearSlowApis: () => void;
 }
 
 export const useSidePanelStore = create<SidePanelState>((set) => ({
@@ -33,6 +44,8 @@ export const useSidePanelStore = create<SidePanelState>((set) => ({
   uploadResult: null,
   deepDiagnosis: false,
   pagePerf: null,
+  monitoringStatus: 'idle',
+  slowApis: [],
 
   setStatus: (status) => set({ status }),
   setStats: (stats) => set({ stats }),
@@ -54,5 +67,20 @@ export const useSidePanelStore = create<SidePanelState>((set) => ({
       uploadResult: null,
       deepDiagnosis: false,
       pagePerf: null,
+      monitoringStatus: 'idle',
+      slowApis: [],
     }),
+
+  setMonitoringStatus: (status) => set({ monitoringStatus: status }),
+  upsertSlowApi: (api) =>
+    set((s) => {
+      const idx = s.slowApis.findIndex((a) => a.requestId === api.requestId);
+      if (idx >= 0) {
+        const updated = [...s.slowApis];
+        updated[idx] = api;
+        return { slowApis: updated };
+      }
+      return { slowApis: [...s.slowApis, api] };
+    }),
+  clearSlowApis: () => set({ slowApis: [] }),
 }));

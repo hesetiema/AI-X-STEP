@@ -5,6 +5,7 @@ import { sessionManager } from './session-manager';
 import { tabRegistry } from './tab-registry';
 import type { RuntimeMessage, UploadResult } from '@/shared/types';
 import { deepDiagnosis } from './cdp-stack-capturer';
+import { slowApiMonitor } from './slow-api-monitor';
 import { loadSession, clearSession } from '@/shared/storage/session-store';
 import { createDiagnosis } from '@/shared/api';
 import { EVIDENCE_TYPE_MAP } from '@/shared/constants';
@@ -147,6 +148,24 @@ async function handleMessage(message: RuntimeMessage, sender: chrome.runtime.Mes
       // 转发性能摘要到 side panel
       chrome.runtime
         .sendMessage({ type: 'PERF_UPDATE', tabId, perf: message.perf })
+        .catch(() => {});
+      return { ok: true };
+    }
+    case 'START_MONITORING': {
+      const tabId = await resolveActiveTabId(message.tabId);
+      slowApiMonitor.start(tabId);
+      console.log('[TraceLens] slow API monitoring started for tab', tabId);
+      return { ok: true };
+    }
+    case 'STOP_MONITORING': {
+      slowApiMonitor.stop();
+      console.log('[TraceLens] slow API monitoring stopped');
+      return { ok: true };
+    }
+    case 'SLOW_API_UPDATE': {
+      const tabId = await resolveActiveTabId(message.tabId);
+      chrome.runtime
+        .sendMessage({ type: 'SLOW_API_UPDATE', tabId, api: message.api })
         .catch(() => {});
       return { ok: true };
     }

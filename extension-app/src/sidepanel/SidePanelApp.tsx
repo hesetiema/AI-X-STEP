@@ -1,9 +1,9 @@
 // sidepanel/SidePanelApp.tsx
-// SidePanel 主入口 —— 常驻侧边栏，含完整录制控制 + 实时事件流 + 用户备注
+// SidePanel 主入口 —— 常驻侧边栏，含慢接口监控 + 诊断录制
 
 import React, { useEffect, useRef, useState } from 'react';
 import { panelStyles, COLORS, SPACING } from './styles';
-import PagePerfIndicator from './components/PagePerfIndicator';
+import SlowApiMonitor from './components/SlowApiMonitor';
 import RecordControls from './components/RecordControls';
 import DeepDiagnosisToggle from './components/DeepDiagnosisToggle';
 import ResultCard from './components/ResultCard';
@@ -16,6 +16,7 @@ import type { RuntimeMessage } from '@/shared/types';
 const SidePanelApp: React.FC = () => {
   const status = useSidePanelStore((s) => s.status);
   const reset = useSidePanelStore((s) => s.reset);
+  const upsertSlowApi = useSidePanelStore((s) => s.upsertSlowApi);
   const { restoreStatus, refreshStats } = useSidePanelActions();
   const pollRef = useRef<number | null>(null);
 
@@ -23,18 +24,19 @@ const SidePanelApp: React.FC = () => {
     restoreStatus();
   }, [restoreStatus]);
 
-  // 监听 Tab 切换：background 通过 chrome.tabs.onActivated 发来 TAB_SWITCHED
-  // 只有普通窗口（normal）才响应，跳过 popup 窗口（如工作台）
+  // 监听 Tab 切换 + 慢接口更新
   useEffect(() => {
     const listener = (message: RuntimeMessage) => {
       if (message.type === 'TAB_SWITCHED') {
         reset();
         restoreStatus();
+      } else if (message.type === 'SLOW_API_UPDATE') {
+        upsertSlowApi(message.api);
       }
     };
     chrome.runtime.onMessage.addListener(listener);
     return () => chrome.runtime.onMessage.removeListener(listener);
-  }, [restoreStatus]);
+  }, [restoreStatus, upsertSlowApi]);
 
   // 录制中：每 2 秒刷新事件统计
   useEffect(() => {
@@ -73,7 +75,7 @@ const SidePanelApp: React.FC = () => {
       {/* Tab Bar */}
       <div style={{ display: 'flex', borderBottom: `1px solid ${COLORS.border}` }}>
         {[
-          { key: 'perf' as const, label: '性能监控' },
+          { key: 'perf' as const, label: '慢接口监控' },
           { key: 'diagnose' as const, label: '诊断录制' },
         ].map((tab) => (
           <button
@@ -102,7 +104,7 @@ const SidePanelApp: React.FC = () => {
       {/* Body */}
       <div style={panelStyles.body}>
         {activeTab === 'perf' ? (
-          <PagePerfIndicator />
+          <SlowApiMonitor />
         ) : (
           <>
             {/* 空闲态：仅开始按钮 + 深度诊断开关 */}
