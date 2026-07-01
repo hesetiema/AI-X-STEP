@@ -5,7 +5,7 @@
 // - 支持筛选：全部 / pending / 已完成
 // - 每行支持复制
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { COLORS, SPACING, panelStyles } from '../styles';
 import { useSidePanelStore } from '../store';
 import { useSidePanelActions } from '../store/use-sidepanel-actions';
@@ -142,6 +142,13 @@ const SlowApiMonitor: React.FC = () => {
 
   const pendingCount = dedupedApis.filter(({ api }) => api.phase === 'pending').length;
   const completedCount = dedupedApis.length - pendingCount;
+
+  // 切到 pending 筛选后，若已无 pending 接口，自动切回全部
+  useEffect(() => {
+    if (filter === 'pending' && pendingCount === 0 && dedupedApis.length > 0) {
+      setFilter('all');
+    }
+  }, [filter, pendingCount, dedupedApis.length]);
 
   const filterChips = [
     { key: 'all' as const, label: '全部', count: dedupedApis.length },
