@@ -44,12 +44,9 @@ function stopRecording(): void {
   if (!recorder.isActive) return;
   domObserver.stop();
   errorObserver.stop();
-  routeObserver.stop();
   networkObserver.stop();
   bridgeListener.stop();
   symptomDetector.stop();
-  perfObserver.stop();
-  initWindowTracker.stop();
   const session = recorder.stop();
   console.log('[TraceLens] recording stopped', session?.events.length ?? 0, 'events');
 }
@@ -110,15 +107,26 @@ async function initFromPersistedSession(): Promise<void> {
 function startAllObservers(): void {
   domObserver.start();
   errorObserver.start();
-  routeObserver.start();
   networkObserver.start();
   bridgeListener.start();
   symptomDetector.start();
-  perfObserver.start();
-  initWindowTracker.start();
 }
 
-void initFromPersistedSession();
+/** 性能相关 observer —— 页面加载即启动，与录制生命周期解耦 */
+function startAutoObservers(): void {
+  perfObserver.start();
+  initWindowTracker.start();
+  routeObserver.start();
+}
+
+void (async () => {
+  const tabId = await resolveTabId();
+  if (tabId !== null && tabId > 0) {
+    recorder.setAutoTabId(tabId);
+  }
+  startAutoObservers();
+  await initFromPersistedSession();
+})();
 
 chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
   handleContentMessage(message)

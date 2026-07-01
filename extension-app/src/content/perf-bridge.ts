@@ -2,7 +2,7 @@
 // 桥接 PerformanceEvent → PagePerfSummary → PERF_UPDATE 消息
 // 修复 PagePerfIndicator 永远停在 "Measuring page load..." 的死链
 
-import type { PerformanceEvent, PagePerfSummary } from '@/shared/types';
+import type { PerformanceEvent, PagePerfSummary, SlowApiInfo } from '@/shared/types';
 import { RECORDER_CONFIG } from '@/shared/constants';
 
 export function buildPagePerfSummary(event: PerformanceEvent): PagePerfSummary {
@@ -15,6 +15,19 @@ export function buildPagePerfSummary(event: PerformanceEvent): PagePerfSummary {
     (t.cls != null && t.cls > RECORDER_CONFIG.HIGH_CLS_THRESHOLD) ||
     observations.includes('slow_api');
 
+  const slowApis: SlowApiInfo[] = (event.firstScreenApis ?? [])
+    .filter(
+      (a): a is typeof a & { phaseDerived: SlowApiInfo['phase'] } =>
+        a.phaseDerived === 'slow' || a.phaseDerived === 'error' || a.phaseDerived === 'timeout',
+    )
+    .map((a) => ({
+      url: a.url,
+      method: a.method,
+      durationMs: a.durationMs,
+      status: a.status,
+      phase: a.phaseDerived,
+    }));
+
   return {
     pageReadyMs: t.firstScreenReadyMs ?? 0,
     lcpMs: t.lcp,
@@ -23,6 +36,7 @@ export function buildPagePerfSummary(event: PerformanceEvent): PagePerfSummary {
     cls: t.cls,
     isSlow,
     observations,
+    slowApis: slowApis && slowApis.length > 0 ? slowApis : undefined,
   };
 }
 

@@ -36,6 +36,14 @@ export interface SessionStats {
   startedAt?: number;
 }
 
+export interface SlowApiInfo {
+  url: string;
+  method: string;
+  durationMs: number;
+  status?: number;
+  phase: 'slow' | 'error' | 'timeout';
+}
+
 export interface PagePerfSummary {
   pageReadyMs: number;
   lcpMs?: number;
@@ -44,6 +52,7 @@ export interface PagePerfSummary {
   cls?: number;
   isSlow: boolean;
   observations: string[];
+  slowApis?: SlowApiInfo[];
 }
 
 export interface UploadResult {

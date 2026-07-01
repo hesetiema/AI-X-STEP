@@ -15,7 +15,6 @@ type DiagState = 'idle' | 'diagnosing' | 'done' | 'error';
 const PagePerfIndicator: React.FC = () => {
   const pagePerf = useSidePanelStore((s) => s.pagePerf);
   const setPagePerf = useSidePanelStore((s) => s.setPagePerf);
-  const status = useSidePanelStore((s) => s.status);
   const [diagState, setDiagState] = useState<DiagState>('idle');
   const [taskId, setTaskId] = useState<string | null>(null);
 
@@ -30,14 +29,6 @@ const PagePerfIndicator: React.FC = () => {
     chrome.runtime.onMessage.addListener(listener);
     return () => chrome.runtime.onMessage.removeListener(listener);
   }, [setPagePerf]);
-
-  useEffect(() => {
-    if (status === 'idle') {
-      setPagePerf(null);
-      setDiagState('idle');
-      setTaskId(null);
-    }
-  }, [status, setPagePerf]);
 
   const handleDiagnose = async () => {
     setDiagState('diagnosing');
@@ -193,6 +184,68 @@ const PagePerfIndicator: React.FC = () => {
               {o}
             </span>
           ))}
+        </div>
+      )}
+
+      {pagePerf && pagePerf.slowApis && pagePerf.slowApis.length > 0 && (
+        <div style={{ marginTop: SPACING.xs }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.warning, marginBottom: 4 }}>
+            ⚠ 慢接口 ({pagePerf.slowApis.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {pagePerf.slowApis.map((api, i) => {
+              const isErr = api.phase === 'error' || api.phase === 'timeout';
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: SPACING.xs,
+                    fontSize: 11,
+                    padding: '3px 6px',
+                    borderRadius: 4,
+                    background: isErr ? COLORS.dangerBg : COLORS.warningBg,
+                  }}
+                >
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: '1px 4px',
+                      borderRadius: 3,
+                      color: '#fff',
+                      background: isErr ? COLORS.danger : COLORS.warning,
+                    }}
+                  >
+                    {api.method}
+                  </span>
+                  <span
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      color: COLORS.text,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={api.url}
+                  >
+                    {api.url}
+                  </span>
+                  <span style={{ flexShrink: 0, color: isErr ? COLORS.danger : COLORS.warning, fontWeight: 600 }}>
+                    {Math.round(api.durationMs)}ms
+                  </span>
+                  {api.status != null && (
+                    <span style={{ flexShrink: 0, fontSize: 10, color: COLORS.muted }}>
+                      {api.status}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

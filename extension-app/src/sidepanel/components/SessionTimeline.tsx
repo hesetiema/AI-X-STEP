@@ -226,7 +226,7 @@ const SessionTimeline: React.FC = () => {
         })}
       </div>
 
-      <div className="timeline-scroll" style={{ maxHeight: 300, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div className="timeline-scroll" style={{ maxHeight: 230, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 4 }}>
         {visibleRows.map((row, idx) => {
           const kind = row.kind;
           const badge =
