@@ -2,7 +2,7 @@
 // SidePanel 状态 —— 实时事件流 + 用户备注 + 慢接口监控
 
 import { create } from 'zustand';
-import type { SessionStatus, SessionStats, ProbeEvent, UploadResult, PagePerfSummary, SlowApiInfo } from '@/shared/types';
+import type { SessionStatus, SessionStats, ProbeEvent, UploadResult, PagePerfSummary, SlowApiInfo, PipelineCheckEvent } from '@/shared/types';
 
 export type MonitoringStatus = 'idle' | 'monitoring' | 'stopped';
 
@@ -18,6 +18,12 @@ interface SidePanelState {
   // 慢接口监控
   monitoringStatus: MonitoringStatus;
   slowApis: SlowApiInfo[];
+  monitoringStartMs: number | null;
+
+  // Pipeline 诊断
+  pipelineFileName: string | null;
+  pipelineRoute: string | null;
+  pipelineResult: PipelineCheckEvent | null;
 
   setStatus: (status: SessionStatus) => void;
   setStats: (stats: SessionStats) => void;
@@ -34,6 +40,11 @@ interface SidePanelState {
   setMonitoringStatus: (status: MonitoringStatus) => void;
   upsertSlowApi: (api: SlowApiInfo) => void;
   clearSlowApis: () => void;
+  setMonitoringStartMs: (ms: number | null) => void;
+
+  // Pipeline 诊断 actions
+  setPipelineInfo: (fileName: string, route: string) => void;
+  setPipelineResult: (result: PipelineCheckEvent | null) => void;
 }
 
 export const useSidePanelStore = create<SidePanelState>((set) => ({
@@ -46,6 +57,10 @@ export const useSidePanelStore = create<SidePanelState>((set) => ({
   pagePerf: null,
   monitoringStatus: 'idle',
   slowApis: [],
+  monitoringStartMs: null,
+  pipelineFileName: null,
+  pipelineRoute: null,
+  pipelineResult: null,
 
   setStatus: (status) => set({ status }),
   setStats: (stats) => set({ stats }),
@@ -69,6 +84,7 @@ export const useSidePanelStore = create<SidePanelState>((set) => ({
       pagePerf: null,
       monitoringStatus: 'idle',
       slowApis: [],
+      monitoringStartMs: null,
     }),
 
   setMonitoringStatus: (status) => set({ monitoringStatus: status }),
@@ -83,4 +99,8 @@ export const useSidePanelStore = create<SidePanelState>((set) => ({
       return { slowApis: [...s.slowApis, api] };
     }),
   clearSlowApis: () => set({ slowApis: [] }),
+  setMonitoringStartMs: (ms) => set({ monitoringStartMs: ms }),
+
+  setPipelineInfo: (fileName, route) => set({ pipelineFileName: fileName, pipelineRoute: route }),
+  setPipelineResult: (result) => set({ pipelineResult: result }),
 }));

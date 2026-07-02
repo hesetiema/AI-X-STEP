@@ -6,6 +6,8 @@ import { panelStyles, COLORS, SPACING } from './styles';
 import SlowApiMonitor from './components/SlowApiMonitor';
 import RecordControls from './components/RecordControls';
 import DeepDiagnosisToggle from './components/DeepDiagnosisToggle';
+import PipelineUploader from './components/PipelineUploader';
+import PipelineResult from './components/PipelineResult';
 import ResultCard from './components/ResultCard';
 import SessionTimeline from './components/SessionTimeline';
 import UserHintForm from './components/UserHintForm';
@@ -112,6 +114,7 @@ const SidePanelApp: React.FC = () => {
               <>
                 <RecordControls />
                 <DeepDiagnosisToggle />
+                <PipelineUploader />
               </>
             )}
 
@@ -120,6 +123,7 @@ const SidePanelApp: React.FC = () => {
               <>
                 <RecordControls />
                 <DeepDiagnosisToggle />
+                <PipelineUploader />
                 <SessionTimeline />
               </>
             )}
@@ -128,6 +132,8 @@ const SidePanelApp: React.FC = () => {
             {(status === 'stopped' || status === 'uploading' || status === 'uploaded' || status === 'failed') && (
               <>
                 <SessionTimeline />
+                <PipelineUploader />
+                <PipelineResult />
                 <ResultCard />
                 <UserHintForm />
                 <RecordControls />

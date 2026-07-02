@@ -46,6 +46,8 @@ function buildLabel(event: ProbeEvent): string {
       return `observation:${event.observationType}`;
     case 'performance':
       return `performance:${event.perfType}`;
+    case 'pipeline_check':
+      return `pipeline:${event.pipelineId}`;
   }
 }
 

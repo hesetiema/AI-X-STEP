@@ -7,3 +7,4 @@ export * from './network';
 export * from './runtime-message';
 export * from './api';
 export * from './init-perf';
+export * from './pipeline';

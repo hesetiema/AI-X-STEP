@@ -29,6 +29,8 @@ class SlowApiMonitor {
   ): void => {
     if (!this.monitoring) return;
     if (this.targetTabId !== null && details.tabId !== this.targetTabId) return;
+    if (details.method === 'OPTIONS') return;
+    if (details.url.includes('/sse/')) return;
 
     this.inFlight.set(details.requestId, {
       requestId: details.requestId,
@@ -64,6 +66,7 @@ class SlowApiMonitor {
       durationMs,
       status: details.statusCode,
       phase: isTimeout ? 'timeout' : isServerError ? 'error' : 'slow',
+      startedAt: req.startedAt,
     });
   };
 
@@ -84,6 +87,7 @@ class SlowApiMonitor {
       method: req.method,
       durationMs,
       phase: 'error',
+      startedAt: req.startedAt,
     });
   };
 
@@ -102,6 +106,7 @@ class SlowApiMonitor {
           method: req.method,
           durationMs: elapsed,
           phase: 'pending',
+          startedAt: req.startedAt,
         });
       }
     }
@@ -122,14 +127,17 @@ class SlowApiMonitor {
     chrome.webRequest.onBeforeRequest.addListener(this.onBeforeRequest, {
       tabId,
       urls: ['<all_urls>'],
+      types: ['xmlhttprequest'],
     });
     chrome.webRequest.onCompleted.addListener(this.onCompleted, {
       tabId,
       urls: ['<all_urls>'],
+      types: ['xmlhttprequest'],
     });
     chrome.webRequest.onErrorOccurred.addListener(this.onErrorOccurred, {
       tabId,
       urls: ['<all_urls>'],
+      types: ['xmlhttprequest'],
     });
 
     this.pendingTimer = setInterval(

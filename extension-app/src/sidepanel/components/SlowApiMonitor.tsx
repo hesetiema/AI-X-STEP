@@ -1,8 +1,9 @@
 // sidepanel/components/SlowApiMonitor.tsx
 // 慢接口监控 —— 手动 start/stop，列出响应慢(>1s)或 pending(>3s) 的接口
 // - 按 method+url 去重（保留最新状态，显示重复计数）
-// - 按请求时间线排序
-// - 支持筛选：全部 / pending / 已完成
+// - monitoring 状态：时间线排序；stopped 状态：响应时间降序
+// - 列表支持筛选：全部 / pending / 已完成
+// - stopped 状态支持 sub-tabs: 列表 / 卡死排行 / 慢接口重灾区 / 瀑布流
 // - 每行支持复制
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -10,6 +11,9 @@ import { COLORS, SPACING, panelStyles } from '../styles';
 import { useSidePanelStore } from '../store';
 import { useSidePanelActions } from '../store/use-sidepanel-actions';
 import type { SlowApiInfo } from '@/shared/types';
+import TopPendingChart from './TopPendingChart';
+import SlowestApisChart from './SlowestApisChart';
+import WaterfallChart from './WaterfallChart';
 
 const PHASE_STYLE: Record<SlowApiInfo['phase'], { icon: string; color: string; bg: string }> = {
   pending: { icon: '🟡', color: COLORS.warning, bg: COLORS.warningBg },
@@ -19,6 +23,7 @@ const PHASE_STYLE: Record<SlowApiInfo['phase'], { icon: string; color: string; b
 };
 
 type FilterKey = 'all' | 'pending' | 'completed';
+type SubTab = 'list' | 'pending' | 'slowest' | 'waterfall';
 
 interface DedupedApi {
   api: SlowApiInfo;
@@ -112,13 +117,21 @@ const SlowApiRow: React.FC<{ item: DedupedApi }> = ({ item }) => {
   );
 };
 
+const SUB_TABS: { key: SubTab; label: string }[] = [
+  { key: 'list', label: '列表' },
+  { key: 'pending', label: '卡死排行' },
+  { key: 'slowest', label: '慢接口' },
+  { key: 'waterfall', label: '瀑布流' },
+];
+
 const SlowApiMonitor: React.FC = () => {
   const monitoringStatus = useSidePanelStore((s) => s.monitoringStatus);
   const slowApis = useSidePanelStore((s) => s.slowApis);
   const { startMonitoring, stopMonitoring } = useSidePanelActions();
   const [filter, setFilter] = useState<FilterKey>('all');
+  const [subTab, setSubTab] = useState<SubTab>('list');
 
-  // 按 method + url 去重，保留最新状态，记录首次出现位置（时间线排序）和重复计数
+  // 按 method + url 去重，保留最新状态，记录首次出现位置和重复计数
   const dedupedApis = useMemo<DedupedApi[]>(() => {
     const map = new Map<string, DedupedApi>();
     slowApis.forEach((api, index) => {
@@ -131,8 +144,15 @@ const SlowApiMonitor: React.FC = () => {
         map.set(key, { api, firstIndex: index, repeatCount: 1 });
       }
     });
-    return Array.from(map.values()).sort((a, b) => a.firstIndex - b.firstIndex);
-  }, [slowApis]);
+    const arr = Array.from(map.values());
+    // stopped 状态：响应时间降序；monitoring 状态：时间线排序
+    if (monitoringStatus === 'stopped') {
+      arr.sort((a, b) => b.api.durationMs - a.api.durationMs);
+    } else {
+      arr.sort((a, b) => a.firstIndex - b.firstIndex);
+    }
+    return arr;
+  }, [slowApis, monitoringStatus]);
 
   const filteredApis = useMemo(() => {
     if (filter === 'all') return dedupedApis;
@@ -185,8 +205,11 @@ const SlowApiMonitor: React.FC = () => {
     );
   }
 
+  const isStopped = monitoringStatus === 'stopped';
+
   return (
     <div style={panelStyles.card}>
+      {/* 标题栏 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>
           {monitoringStatus === 'monitoring' ? '🔴 监控中' : '📊 监控结果'}
@@ -231,8 +254,35 @@ const SlowApiMonitor: React.FC = () => {
         )}
       </div>
 
-      {/* 筛选栏 */}
-      {filterChips.length > 1 && (
+      {/* stopped 状态：sub-tabs */}
+      {isStopped && dedupedApis.length > 0 && (
+        <div style={{ display: 'flex', gap: 2, marginBottom: SPACING.sm, borderBottom: `1px solid ${COLORS.border}` }}>
+          {SUB_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setSubTab(tab.key)}
+              style={{
+                flex: 1,
+                padding: '6px 0',
+                background: 'none',
+                border: 'none',
+                borderBottom: subTab === tab.key ? `2px solid ${COLORS.primary}` : '2px solid transparent',
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: subTab === tab.key ? 600 : 400,
+                color: subTab === tab.key ? COLORS.primary : COLORS.textSecondary,
+                fontFamily: 'inherit',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 列表视图的筛选栏（仅 list sub-tab 或 monitoring 状态） */}
+      {(!isStopped || subTab === 'list') && filterChips.length > 1 && (
         <div style={{ display: 'flex', gap: 4, marginBottom: SPACING.sm }}>
           {filterChips.map((chip) => {
             const active = filter === chip.key;
@@ -261,18 +311,28 @@ const SlowApiMonitor: React.FC = () => {
         </div>
       )}
 
-      {filteredApis.length === 0 ? (
-        <div style={{ fontSize: 12, color: COLORS.textSecondary, textAlign: 'center', padding: `${SPACING.xl}px 0` }}>
-          {dedupedApis.length === 0
-            ? monitoringStatus === 'monitoring' ? '暂无慢接口，持续监控中...' : '本次监控未发现慢接口'
-            : '当前筛选下无接口'}
-        </div>
+      {/* 内容区 */}
+      {isStopped && subTab === 'pending' ? (
+        <TopPendingChart />
+      ) : isStopped && subTab === 'slowest' ? (
+        <SlowestApisChart />
+      ) : isStopped && subTab === 'waterfall' ? (
+        <WaterfallChart />
       ) : (
-        <div className="timeline-scroll" style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {filteredApis.map((item) => (
-            <SlowApiRow key={`${item.api.method}-${item.api.url}`} item={item} />
-          ))}
-        </div>
+        // 列表视图（monitoring 状态 或 stopped 的 list sub-tab）
+        filteredApis.length === 0 ? (
+          <div style={{ fontSize: 12, color: COLORS.textSecondary, textAlign: 'center', padding: `${SPACING.xl}px 0` }}>
+            {dedupedApis.length === 0
+              ? monitoringStatus === 'monitoring' ? '暂无慢接口，持续监控中...' : '本次监控未发现慢接口'
+              : '当前筛选下无接口'}
+          </div>
+        ) : (
+          <div className="timeline-scroll" style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {filteredApis.map((item) => (
+              <SlowApiRow key={`${item.api.method}-${item.api.url}`} item={item} />
+            ))}
+          </div>
+        )
       )}
     </div>
   );

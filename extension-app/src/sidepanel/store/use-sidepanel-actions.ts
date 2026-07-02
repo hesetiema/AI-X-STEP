@@ -3,7 +3,7 @@
 
 import { useCallback } from 'react';
 import { useSidePanelStore } from './sidepanel-store';
-import type { SessionStats, SessionStatus, UploadResult, ProbeEvent } from '@/shared/types';
+import type { SessionStats, SessionStatus, UploadResult, ProbeEvent, TracelensPipeline, PipelineCheckEvent } from '@/shared/types';
 
 interface TabMeta {
   tabId: number;
@@ -22,6 +22,12 @@ interface StatusResponse {
 interface EventsResponse {
   ok: boolean;
   events?: ProbeEvent[];
+}
+
+interface PipelineCheckResponse {
+  ok: boolean;
+  result?: PipelineCheckEvent;
+  error?: string;
 }
 
 function sendMessage<T = unknown>(message: unknown): Promise<T> {
@@ -43,6 +49,8 @@ export function useSidePanelActions() {
   const reset = useSidePanelStore((s) => s.reset);
   const deepDiagnosis = useSidePanelStore((s) => s.deepDiagnosis);
   const toggleDeepDiagnosis = useSidePanelStore((s) => s.toggleDeepDiagnosis);
+  const setPipelineInfo = useSidePanelStore((s) => s.setPipelineInfo);
+  const setPipelineResult = useSidePanelStore((s) => s.setPipelineResult);
 
   const startRecording = useCallback(async () => {
     try {
@@ -79,7 +87,6 @@ export function useSidePanelActions() {
       if (res.ok) {
         setStatus('stopped');
       }
-      // 停止后立即拉一次最终事件列表到侧边栏
       const eventsRes = await sendMessage<EventsResponse>({
         type: 'FETCH_EVENTS',
       });
@@ -127,7 +134,6 @@ export function useSidePanelActions() {
         setStatus(res.meta.status);
         if (res.meta.lastUpload) setUploadResult(res.meta.lastUpload);
       }
-      // 同时拉取事件列表
       const eventsRes = await sendMessage<EventsResponse>({
         type: 'FETCH_EVENTS',
       });
@@ -170,10 +176,12 @@ export function useSidePanelActions() {
 
   const setMonitoringStatus = useSidePanelStore((s) => s.setMonitoringStatus);
   const clearSlowApis = useSidePanelStore((s) => s.clearSlowApis);
+  const setMonitoringStartMs = useSidePanelStore((s) => s.setMonitoringStartMs);
 
   const startMonitoring = useCallback(async () => {
     try {
       clearSlowApis();
+      setMonitoringStartMs(Date.now());
       const res = await sendMessage<{ ok: boolean }>({ type: 'START_MONITORING' });
       if (res.ok) {
         setMonitoringStatus('monitoring');
@@ -181,7 +189,7 @@ export function useSidePanelActions() {
     } catch (err) {
       console.error('[TraceLens] startMonitoring error', err);
     }
-  }, [clearSlowApis, setMonitoringStatus]);
+  }, [clearSlowApis, setMonitoringStatus, setMonitoringStartMs]);
 
   const stopMonitoring = useCallback(async () => {
     try {
@@ -191,6 +199,29 @@ export function useSidePanelActions() {
       console.error('[TraceLens] stopMonitoring error', err);
     }
   }, [setMonitoringStatus]);
+
+  const registerPipeline = useCallback(async (pipeline: TracelensPipeline, fileName: string) => {
+    try {
+      await sendMessage({ type: 'REGISTER_PIPELINE', pipeline });
+      setPipelineInfo(fileName, pipeline.route);
+      console.log('[TraceLens] pipeline registered:', fileName, pipeline.route);
+    } catch (err) {
+      console.error('[TraceLens] registerPipeline error', err);
+    }
+  }, [setPipelineInfo]);
+
+  const runPipelineCheck = useCallback(async () => {
+    try {
+      const res = await sendMessage<PipelineCheckResponse>({ type: 'RUN_PIPELINE_CHECK' });
+      if (res.ok && res.result) {
+        setPipelineResult(res.result);
+      } else {
+        console.warn('[TraceLens] pipeline check failed:', res.error);
+      }
+    } catch (err) {
+      console.error('[TraceLens] runPipelineCheck error', err);
+    }
+  }, [setPipelineResult]);
 
   return {
     startRecording,
@@ -203,5 +234,7 @@ export function useSidePanelActions() {
     toggleDeepDiagnosis: toggleDeep,
     startMonitoring,
     stopMonitoring,
+    registerPipeline,
+    runPipelineCheck,
   };
 }

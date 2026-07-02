@@ -28,7 +28,10 @@ export type RuntimeMessage =
   // 慢接口监控
   | { type: 'START_MONITORING'; tabId: number }
   | { type: 'STOP_MONITORING'; tabId: number }
-  | { type: 'SLOW_API_UPDATE'; tabId: number; api: SlowApiInfo };
+  | { type: 'SLOW_API_UPDATE'; tabId: number; api: SlowApiInfo }
+  // Pipeline
+  | { type: 'REGISTER_PIPELINE'; pipeline: import('./pipeline').TracelensPipeline }
+  | { type: 'RUN_PIPELINE_CHECK' };
 
 export interface SessionStats {
   total: number;
@@ -47,6 +50,7 @@ export interface SlowApiInfo {
   durationMs: number;
   status?: number;
   phase: 'slow' | 'error' | 'timeout' | 'pending';
+  startedAt: number;
 }
 
 export interface PagePerfSummary {

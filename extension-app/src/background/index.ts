@@ -248,6 +248,16 @@ async function handleMessage(message: RuntimeMessage, sender: chrome.runtime.Mes
         return { ok: false, error: err instanceof Error ? err.message : String(err) };
       }
     }
+    case 'REGISTER_PIPELINE': {
+      const tabId = await resolveActiveTabId();
+      const res = await chrome.tabs.sendMessage(tabId, message);
+      return res ?? { ok: true };
+    }
+    case 'RUN_PIPELINE_CHECK': {
+      const tabId = await resolveActiveTabId();
+      const res = await chrome.tabs.sendMessage(tabId, message);
+      return res ?? { ok: false, error: 'no response from content script' };
+    }
     default:
       return { ok: false, error: 'unknown message type' };
   }

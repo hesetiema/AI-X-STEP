@@ -10,7 +10,8 @@ export type ProbeEvent =
   | ErrorEvent
   | BridgeEvent
   | ObservationEvent
-  | PerformanceEvent;
+  | PerformanceEvent
+  | PipelineCheckEvent;
 
 export interface BaseProbeEvent {
   eventId: string;
@@ -140,4 +141,26 @@ export interface FirstScreenApiSummary {
   durationMs: number;
   phaseDerived: 'success' | 'error' | 'timeout' | 'slow' | 'normal';
   isBlocking?: boolean;
+}
+
+export interface PipelineNodeCheckResult {
+  name: string;
+  status: 'passed' | 'failed' | 'skipped';
+  value?: unknown;
+  expected?: unknown;
+  error?: string;
+}
+
+export interface PipelineFieldCheckResult {
+  field: string;
+  label: string;
+  nodes: PipelineNodeCheckResult[];
+  breakpoint?: string;
+}
+
+export interface PipelineCheckEvent extends BaseProbeEvent {
+  kind: 'pipeline_check';
+  pipelineId: string;
+  route: string;
+  fieldChecks: PipelineFieldCheckResult[];
 }

@@ -19,6 +19,7 @@ import { normalizeNetworkEvent } from './network-normalizer';
 import { InMemoryMappingRegistry } from './mapping-registry';
 import { defaultMappings } from './default-mappings';
 import { DefaultNetworkInsightTransformer } from './network-insight-transformer';
+import { apiResponseCache } from '../api-response-cache';
 
 const MESSAGE_SOURCE = 'tracelens-main-world';
 
@@ -115,6 +116,11 @@ export class NetworkObserver {
 
     const sanitized = sanitizeNetworkEvent(raw);
     const normalized = normalizeNetworkEvent(sanitized);
+
+    // Populate API response cache for Pipeline runner field extraction
+    if ((raw.phase === 'response' || raw.phase === 'error') && raw.responseBody !== undefined) {
+      apiResponseCache.set(raw.method, raw.url, sanitized.urlPattern, raw.responseBody);
+    }
 
     let insight: NetworkInsight | undefined;
     if (raw.phase !== 'request') {

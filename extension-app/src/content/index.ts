@@ -10,9 +10,10 @@ import { BridgeListener } from './bridge-listener';
 import { UiSymptomDetector } from './ui-symptom-detector';
 import { PerformanceObserver_ as PerfObserver } from './performance-observer';
 import { InitWindowTracker, setInitWindowTracker } from './init-window-tracker';
+import { PipelineRunner, pipelineRegistry } from './pipeline-runner';
 import { readPageContext } from './page-context-reader';
 import { loadSession } from '@/shared/storage/session-store';
-import type { RuntimeMessage, DiagnosisSession, UserHint } from '@/shared/types';
+import type { RuntimeMessage, DiagnosisSession, UserHint, TracelensPipeline } from '@/shared/types';
 
 const domObserver = new DomObserver(recorder);
 const errorObserver = new ErrorObserver(recorder);
@@ -22,8 +23,11 @@ const bridgeListener = new BridgeListener(recorder);
 const symptomDetector = new UiSymptomDetector(recorder);
 const initWindowTracker = new InitWindowTracker({ recorder });
 setInitWindowTracker(initWindowTracker);
+const pipelineRunner = new PipelineRunner(recorder);
 const perfObserver = new PerfObserver(recorder, (event, summary) => {
   initWindowTracker.onFirstScreenReady(event, summary);
+  // Trigger pipeline checks on first screen complete
+  pipelineRunner.runAndRecord();
 });
 routeObserver.onRouteChange(() => perfObserver.onRouteChange());
 
@@ -178,6 +182,16 @@ async function handleContentMessage(message: RuntimeMessage): Promise<unknown> {
       return { ok: true, events: recorder.getAutoObserveSnapshot() };
     case 'FETCH_INIT_WINDOW':
       return { ok: true, window: initWindowTracker.getCurrentWindow() };
+    case 'REGISTER_PIPELINE':
+      if (message.pipeline) {
+        pipelineRegistry.register(message.pipeline as TracelensPipeline);
+        console.log('[TraceLens] pipeline registered:', (message.pipeline as TracelensPipeline).route);
+      }
+      return { ok: true };
+    case 'RUN_PIPELINE_CHECK': {
+      const result = pipelineRunner.run();
+      return { ok: true, result };
+    }
     default:
       return { ok: false, error: 'unknown message type' };
   }

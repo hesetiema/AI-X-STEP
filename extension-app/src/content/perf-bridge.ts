@@ -27,6 +27,7 @@ export function buildPagePerfSummary(event: PerformanceEvent): PagePerfSummary {
       durationMs: a.durationMs,
       status: a.status,
       phase: a.phaseDerived,
+      startedAt: a.startedAt,
     }));
 
   return {
